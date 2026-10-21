@@ -1,0 +1,14 @@
+const fs=require('fs'),crypto=require('crypto');
+const archive=process.argv[2];
+const pk=Buffer.from('RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3','base64');
+const lines=fs.readFileSync(archive+'.minisig','utf8').trim().split(/\r?\n/);
+const sig=Buffer.from(lines[1],'base64');
+if (!sig.subarray(2,10).equals(pk.subarray(2,10)))throw Error('Key id mismatch');
+const key=crypto.createPublicKey({key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),pk.subarray(10)]),format:'der',type:'spki'});
+let data=fs.readFileSync(archive);
+if(sig.subarray(0,2).toString()==='ED')data=crypto.createHash('blake2b512').update(data).digest();
+else if(sig.subarray(0,2).toString()!=='Ed')throw Error('Unknown minisign algorithm');
+if(!crypto.verify(null,data,key,sig.subarray(10)))throw Error('Archive signature invalid');
+const comment=lines[2].replace(/^trusted comment: /,'');
+if(!crypto.verify(null,Buffer.concat([sig.subarray(10),Buffer.from(comment)]),key,Buffer.from(lines[3],'base64')))throw Error('Trusted comment signature invalid');
+console.log('Official minisign signature verified: '+comment);

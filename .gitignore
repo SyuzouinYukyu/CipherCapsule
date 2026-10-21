@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/Work/
+**/probe-results/
+*.log
+*.tmp
+*.pdb
+*.cache
+*.ini
+*.exe
+!templates/CipherCapsule_Viewer.exe
+.vs/
+.vscode/
+__pycache__/
+*.pyc
