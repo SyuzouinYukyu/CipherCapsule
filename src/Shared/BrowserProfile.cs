@@ -4,7 +4,7 @@ using System.Security.Principal;
 namespace CipherCapsule.UI;
 public sealed class BrowserProfile
 {
-    static readonly string Root=Path.Combine(Path.GetTempPath(),"CipherCapsule-v111");
+    static readonly string Root=Path.Combine(Path.GetTempPath(),"CipherCapsule-v112");
     public string PathName{get;}=Path.Combine(Root,Guid.NewGuid().ToString("N"));
     public bool CleanupFailed{get;private set;}public string FailureReason{get;private set;}="";
     readonly TaskCompletionSource exited=new(TaskCreationOptions.RunContinuationsAsynchronously);

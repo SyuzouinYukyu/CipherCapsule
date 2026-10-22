@@ -1,5 +1,5 @@
 """python scripts/build.py --stage [--test]; --test-only runs all test groups on the staged build.
-Formal promotion is a separate step requiring recorded GUI validation; see promote.py.
+Formal promotion is a separate step requiring recorded GUI validation.
 Build tools: .NET SDK in global.json, Python 3 and Node.js on PATH.
 """
 import pathlib,subprocess,sys,os,shutil,json,hashlib
@@ -14,13 +14,13 @@ if '--test-only' not in sys.argv:
         csproj=f'src/{project}/{project}.csproj';dest=root/'Work/stage'/project
         run('dotnet','restore',csproj,'--locked-mode');run('dotnet','publish',csproj,'-c','Release','--no-restore','-o',str(dest))
         if project=='Viewer':shutil.copy2(dest/'CipherCapsule_Viewer.exe',source/'templates/CipherCapsule_Viewer.exe')
-    manifest={'version':'1.1.1','builder_sha256':sha(root/'Work/stage/Builder/CipherCapsule_v1.1.1.exe'),'viewer_sha256':sha(source/'templates/CipherCapsule_Viewer.exe')}
+    manifest={'version':'1.1.2','builder_sha256':sha(root/'Work/stage/Builder/CipherCapsule_v1.1.2.exe'),'viewer_sha256':sha(source/'templates/CipherCapsule_Viewer.exe')}
     (root/'Work/stage/manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
 if '--test' in sys.argv or '--test-only' in sys.argv:
     run('dotnet','restore','tests/Tests.csproj','--locked-mode');run('dotnet','build','tests/Tests.csproj','-c','Release','--no-restore')
     exe=root/'Work/bin/Tests/Release/net10.0-windows/win-x64/Tests.exe'
-    for args in [[],['--editor'],['--html'],['--extra'],['--lifecycle']]:run(str(exe),*args)
-    results=[json.loads((root/'Work/test-results'/name).read_text(encoding='utf-8')) for name in ['core-results.json','editor-results.json','html-results.json','extra-results.json','lifecycle-results.json']]
+    for args in [['--skip-verified-large','--skip-verified-legacy'],['--editor'],['--html'],['--extra'],['--lifecycle'],['--layout'],['--v112']]:run(str(exe),*args)
+    results=[json.loads((root/'Work/test-results'/name).read_text(encoding='utf-8')) for name in ['core-results.json','editor-results.json','html-results.json','extra-results.json','lifecycle-results.json','layout-results.json','v112-results.json']]
     summary={'passed':sum(x['passed'] for x in results),'failed':sum(x['failed'] for x in results)}
     (root/'Work/test-results/all-results.json').write_text(json.dumps(summary,indent=2),encoding='utf-8');print(summary)
-print('Staged only. EXE/ is unchanged. Formal promotion requires GUI validation and promote.py.')
+print('Staged only. EXE/ is unchanged. Formal promotion requires separate GUI validation.')

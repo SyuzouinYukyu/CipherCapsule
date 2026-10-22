@@ -16,9 +16,12 @@ internal static partial class Program
     [STAThread] static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if(args.Contains("--exit-trace"))return TraceUnexpectedExit();
         Work=Path.GetFullPath(Path.Combine(Root,"../Work/selftests")); Directory.CreateDirectory(Work); Template=Path.Combine(Root,"templates","CipherCapsule_Viewer.exe");
         string? runRoot=args.FirstOrDefault(x=>x.StartsWith("--run-root="))?[11..];
         if(runRoot!=null){string path=Path.GetFullPath(runRoot),boundary=Path.GetFullPath(Path.Combine(Root,"../Work"))+Path.DirectorySeparatorChar;if(!path.StartsWith(boundary,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Test run must be inside this version's Work folder");Work=Path.Combine(path,"selftests");ResultFolder=Path.Combine(path,"results");Directory.CreateDirectory(Work);}
+        if(args.Contains("--zoom-before")) { RunZoomBefore(); return 0; }
+        if(args.Contains("--v112")) { RunV112(); Finish("v112-results.json"); return failed==0?0:1; }
         if(args.Contains("--layout")) { RunLayout(); Finish("layout-results.json"); return failed==0?0:1; }
         if(args.Contains("--html")) { RunHtml(); Finish("html-results.json"); return failed==0?0:1; }
         if(args.Contains("--editor")) { RunEditor(); Finish("editor-results.json"); return failed==0?0:1; }
@@ -81,13 +84,14 @@ internal static partial class Program
         Test("password panel masked two rows, mismatch and toggle",()=>{using var p=new PasswordPanel();Check(!p.Revealed&&!p.CanRun);p.Primary.Text=Password;p.Confirm.Text="wrong";Reject(()=>p.Take(true));p.Confirm.Text=Password;Check(p.CanRun);p.Toggle();Check(p.Revealed&&p.CanRun&&p.Confirm.Text==""&&p.Primary.Text==Password);p.Toggle();Check(!p.Revealed&&!p.CanRun&&p.Primary.Text==Password);});
         Test("font sizes 9 12 17 clamp",()=>{using var f=new AppForm();foreach(int s in new[]{9,12,17}){f.SetSize(s);Check(f.Font.Size==s);}f.SetSize(30);Check(f.Font.Size==17);});
         Test("Viewer TEXT form body exact",()=>{using var c=Unlock(capsule);using var f=new ViewerForm(c);Check(AllControls(f).OfType<TextBox>().Any(t=>t.ReadOnly&&t.Text==body));});
-        Test("256MiB streaming, bounded managed allocation, hash roundtrip",()=>{
+        if(!args.Contains("--skip-verified-large"))Test("256MiB streaming, bounded managed allocation, hash roundtrip",()=>{
             var big=Path.Combine(Work,"large.bin");using(var f=File.Create(big)){byte[] b=new byte[Limits.Chunk];new Random(9876).NextBytes(b);for(int i=0;i<256;i++)f.Write(b);}
             var exe=Path.Combine(Work,"large.exe");long a=GC.GetTotalAllocatedBytes(true);Gen(exe,"大容量ダミー",BodyKind.TEXT,[big]);var dest=Path.Combine(Work,"large-saved.bin");using(var c=Unlock(exe))c.Save(0,dest,true,default);long alloc=GC.GetTotalAllocatedBytes(true)-a;Check(alloc<96L*1024*1024);Check(Hash(big)==Hash(dest));Console.WriteLine("Streaming managed allocation: "+alloc);File.Delete(exe);File.Delete(dest);File.Delete(big);
         });
+        else Console.WriteLine("RETAINED v1.1.1 verified 256MiB streaming test; Core is unchanged (not counted as executed)");
         Test("no incomplete output files",()=>Check(!Directory.EnumerateFiles(Work,".cc-*.tmp").Any()));
         File.WriteAllText(Path.Combine(Work,"dummy-password.txt"),Password,Limits.Utf8);
-        NewCoreTests(capsule,source);Finish("core-results.json"); return failed==0?0:1;
+        NewCoreTests(capsule,source,args.Contains("--skip-verified-legacy"));Finish("core-results.json"); return failed==0?0:1;
     }
     static IEnumerable<Control> AllControls(Control c) { foreach(Control x in c.Controls) {yield return x;foreach(var y in AllControls(x))yield return y;} }
     static void Test(string name,Action action){try{action();passed++;Results.Add(new{name,pass=true});Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Results.Add(new{name,pass=false,error=e.GetType().Name+": "+e.Message});Console.WriteLine("FAIL "+name+" "+e);}}

@@ -12,17 +12,17 @@
         "resolved": "1.0.4258.31",
         "contentHash": "sHVZ2MQrHT1J3q5/6csn0fIP27rzpTO/RRC+wPQDrZheB7T4t2n+vVbY6SdCKr4WRV9s/gmBM3PPMWWJtoDzMg=="
       },
-      "CipherCapsule_v1.1.1": {
+      "CipherCapsule_v1.1.2": {
         "type": "Project",
         "dependencies": {
-          "Core": "[1.1.1, )",
+          "Core": "[1.1.2, )",
           "Microsoft.Web.WebView2": "[1.0.4258.31, )"
         }
       },
       "CipherCapsule_Viewer": {
         "type": "Project",
         "dependencies": {
-          "Core": "[1.1.1, )",
+          "Core": "[1.1.2, )",
           "Microsoft.Web.WebView2": "[1.0.4258.31, )"
         }
       },

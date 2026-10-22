@@ -11,17 +11,20 @@ public class AppForm : Form
         StartPosition=FormStartPosition.CenterScreen; MinimumSize=new Size(640,480); KeyPreview=true;
         try { Icon=Icon.ExtractAssociatedIcon(Environment.ProcessPath!); } catch { }
     }
-    public void SetSize(float size) { UiSize=Math.Clamp(size,9,17); Font=new Font("Yu Gothic UI",UiSize); OnFontSizeChanged(); }
+    public void SetSize(float size) { if(!float.IsFinite(size))return;float next=Math.Clamp(size,9,17);if(next==UiSize)return;UiSize=next;Font=new Font("Yu Gothic UI",UiSize);OnFontSizeChanged(); }
     protected virtual void OnFontSizeChanged() { }
     protected override bool ProcessCmdKey(ref Message msg,Keys keyData)
     {
-        if((keyData&Keys.Control)!=0)
-        {
-            var k=keyData&Keys.KeyCode;
-            if(k is Keys.Add or Keys.Oemplus) { SetSize(UiSize+1); return true; }
-            if(k is Keys.Subtract or Keys.OemMinus) { SetSize(UiSize-1); return true; }
-        }
+        if(HandleZoomKey(keyData))return true;
         return base.ProcessCmdKey(ref msg,keyData);
+    }
+    public bool HandleZoomKey(Keys keyData)
+    {
+        if((keyData&Keys.Control)==0||(keyData&Keys.Alt)!=0)return false;
+        var key=keyData&Keys.KeyCode;
+        if(key is Keys.Add or Keys.Oemplus){SetSize(UiSize+1);return true;}
+        if(key is Keys.Subtract or Keys.OemMinus){SetSize(UiSize-1);return true;}
+        return false;
     }
     public static Button Button(string text,EventHandler? handler=null) { var b=new Button { Text=text,AutoSize=true,Padding=new Padding(8,3,8,3),Margin=new Padding(4),MinimumSize=new Size(0,36) }; if(handler!=null)b.Click+=handler; return b; }
     public static FlowLayoutPanel Flow(params Control[] controls) { var f=new FlowLayoutPanel { AutoSize=true,Dock=DockStyle.Fill,WrapContents=true,Margin=new Padding(0) }; f.Controls.AddRange(controls); return f; }
@@ -63,9 +66,10 @@ public sealed class PasswordPanel : TableLayoutPanel
         Controls.Add(confirmLabel,0,1); Controls.Add(Confirm,1,1);
         Primary.TextChanged+=(_,_)=>ValidityChanged?.Invoke(this,EventArgs.Empty); Confirm.TextChanged+=(_,_)=>ValidityChanged?.Invoke(this,EventArgs.Empty);
     }
-    public void Toggle()
+    public void Toggle()=>SetRevealed(!Revealed);
+    public void SetRevealed(bool revealed)
     {
-        Revealed=!Revealed; Primary.UseSystemPasswordChar=!Revealed; Confirm.Clear(); Confirm.Visible=!Revealed; confirmLabel.Visible=!Revealed;
+        if(Revealed==revealed)return;Revealed=revealed; Primary.UseSystemPasswordChar=!Revealed; Confirm.Clear(); Confirm.Visible=!Revealed; confirmLabel.Visible=!Revealed;
         Eye.Text=Revealed?"隠す":"表示"; var old=Eye.Image;Eye.Image=EyeImage(Revealed);old?.Dispose(); ValidityChanged?.Invoke(this,EventArgs.Empty);
     }
     public byte[] Take(bool creation)
