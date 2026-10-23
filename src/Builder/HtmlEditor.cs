@@ -12,6 +12,8 @@ public sealed class HtmlEditor : UserControl
     readonly TabControl tabs=new(){Dock=DockStyle.Fill};readonly BrowserProfile profile=new();readonly SemaphoreSlim sync=new(1,1);
     readonly Dictionary<string,byte[]> assets=[];readonly List<MemoryStream> responses=[];
     readonly string origin="https://editor.invalid";bool ready,closed,switching;string pending="";int previous;Task? initialization;Task<bool>? cleanup;
+    [System.ComponentModel.Browsable(false),System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Func<string[],Task>? FileDropRequested{get;set;}
     public string CleanupFailure=>profile.FailureReason;
     public bool IsReady=>ready;public WebView2 EditorBrowser=>web;public bool IsCode=>tabs.SelectedIndex==1;
     public HtmlEditor()
@@ -37,11 +39,36 @@ public sealed class HtmlEditor : UserControl
                 e.Response=env.CreateWebResourceResponse(m,200,"OK","Content-Type: "+type+"; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; font-src 'self'; frame-src 'self' about:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");
             }else e.Response=env.CreateWebResourceResponse(null,403,"Blocked","Cache-Control: no-store");
         };
-        c.WebMessageReceived+=(_,e)=>{if(e.Source!=origin+"/index.html"||closed)return;try{using var m=JsonDocument.Parse(e.WebMessageAsJson);string? type=m.RootElement.GetProperty("type").GetString();string action=type=="clipboard"?m.RootElement.GetProperty("action").GetString()??"":"";BeginInvoke(new Action(async()=>{if(closed)return;try{if(type=="pickImage")await PickImage();else if(type=="clipboard")await ClipboardAction(action);}catch(Exception ex){AppForm.Error(this,ex);}}));}catch{}};
+        c.WebMessageReceived+=ReceiveWebMessage;
         web.AllowExternalDrop=false;web.KeyDown+=(_,e)=>{Keys k=e.KeyCode;if(e.Control&&k is Keys.Add or Keys.Oemplus or Keys.Subtract or Keys.OemMinus){e.Handled=true;e.SuppressKeyPress=true;if(FindForm() is AppForm f)f.SetSize(f.UiSize+(k is Keys.Add or Keys.Oemplus?1:-1));}};
         c.Navigate(origin+"/index.html");
-        for(int i=0;i<150;i++){if(closed)return;try{if(await c.ExecuteScriptAsync("window.ccReady === true")=="true"){ready=true;await SetVisual(pending);await ApplyUiFont();return;}}catch{}await Task.Delay(100);}
+        for(int i=0;i<150;i++){if(closed)return;try{if(await c.ExecuteScriptAsync("window.ccReady === true")=="true"){ready=true;await BindFileDrops();await SetVisual(pending);await ApplyUiFont();return;}}catch{}await Task.Delay(100);}
         throw new IOException("オフラインHTMLエディターを初期化できませんでした。");
+    }
+    void ReceiveWebMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        if(e.Source!=origin+"/index.html"||closed)return;
+        try{
+            using var message=JsonDocument.Parse(e.WebMessageAsJson);
+            string? type=message.RootElement.GetProperty("type").GetString();
+            if(type=="ccapDrop"){
+                var objects=e.AdditionalObjects;
+                if(FileDropRequested==null||objects==null||objects.Count==0||objects.Count>100||objects.Any(o=>o is not CoreWebView2File))return;
+                string[] paths=objects.Cast<CoreWebView2File>().Select(f=>f.Path).ToArray();
+                BeginInvoke(new Action(async()=>{if(!closed&&FileDropRequested!=null)try{await FileDropRequested(paths);}catch(Exception ex){AppForm.Error(this,ex);}}));
+                return;
+            }
+            string action=type=="clipboard"?message.RootElement.GetProperty("action").GetString()??"":"";
+            BeginInvoke(new Action(async()=>{if(closed)return;try{if(type=="pickImage")await PickImage();else if(type=="clipboard")await ClipboardAction(action);}catch(Exception ex){AppForm.Error(this,ex);}}));
+        }catch{}
+    }
+    async Task BindFileDrops()
+    {
+        if(FileDropRequested==null)return;
+        using var resource=Assembly.GetExecutingAssembly().GetManifestResourceStream("CcapDropScript")??throw new IOException("CCAPドロップ処理を読み込めません。");
+        using var reader=new StreamReader(resource);
+        await web.CoreWebView2.ExecuteScriptAsync(await reader.ReadToEndAsync());
+        web.AllowExternalDrop=true;
     }
     async Task PickImage()
     {

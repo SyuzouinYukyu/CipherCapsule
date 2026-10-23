@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><UseWindowsForms>false</UseWindowsForms><PublishSingleFile>false</PublishSingleFile></PropertyGroup><ItemGroup><Compile Include="../../src/Shared/RepositoryLink.cs" Link="RepositoryLink.cs" /><Compile Include="../../src/Builder/OutputFolder.cs" Link="OutputFolder.cs" /></ItemGroup></Project>

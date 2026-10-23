@@ -93,23 +93,23 @@ public sealed class PasswordDialog : AppForm
     readonly Button unlock,cancel; readonly Label status=Label("パスワードを入力してください。");
     CancellationTokenSource? cts; bool working;
     public Container.UnlockedCapsule? Capsule { get; private set; }
-    public PasswordDialog(string path)
+    public PasswordDialog(string path,bool ccapOnly=false)
     {
         Text="CipherCapsule — パスワード認証"; ClientSize=new Size(720,300); MinimumSize=new Size(640,330);
         var layout=new TableLayoutPanel { Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(14),RowCount=4,ColumnCount=1 };
-        unlock=Button("復号して開く",async(_,_)=>await Open(path)); unlock.Enabled=false;
+        unlock=Button("復号して開く",async(_,_)=>await Open(path,ccapOnly)); unlock.Enabled=false;
         cancel=Button("閉じる／キャンセル",(_,_)=>{ if(working)cts?.Cancel(); else Close(); });
         layout.Controls.Add(Label("マスク時は確認入力も必要です。表示切替で1行にできます。")); layout.Controls.Add(Password); layout.Controls.Add(status); layout.Controls.Add(Flow(unlock,cancel)); Controls.Add(layout);
         Password.ValidityChanged+=(_,_)=>unlock.Enabled=!working&&Password.CanRun; AcceptButton=unlock; CancelButton=cancel;
         FormClosing+=(_,e)=>{ if(working) { e.Cancel=true; cts?.Cancel(); } else Password.ClearSecrets(); };
     }
-    async Task Open(string path)
+    async Task Open(string path,bool ccapOnly)
     {
         byte[]? p=null;
         try {
             p=Password.Take(false); working=true; unlock.Enabled=false; Password.Enabled=false; cts=new();
             status.Text="パスワードと全添付の暗号文を検証しています…";
-            byte[] key=p; Capsule=await Task.Run(()=>CipherCapsule.Core.Container.Unlock(path,key,cts.Token));
+            byte[] key=p; Capsule=await Task.Run(()=>CipherCapsule.Core.Container.Unlock(path,key,cts.Token,ccapOnly:ccapOnly));
             Password.ClearSecrets(); DialogResult=DialogResult.OK;
         }
         catch(Exception ex) { Error(this,ex); status.Text="再入力してください。"; }

@@ -34,7 +34,7 @@ public sealed class ViewerForm : AppForm
         var footer=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=2};footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));footer.Controls.Add(bar,0,0);
         var spec=new LinkLabel{Text="暗号アルゴリズム仕様",AutoSize=true,Anchor=AnchorStyles.Right,Margin=new Padding(10,4,4,4)};tips.SetToolTip(spec,"実装されている暗号方式・整合性確認・制限を表示します。");spec.LinkClicked+=(_,_)=>ShowSpecification();footer.Controls.Add(spec,1,0);root.Controls.Add(footer,0,3);Controls.Add(root);
         files.SelectedIndexChanged+=(_,_)=>save.Enabled=!busy&&files.SelectedIndices.Count==1;
-        FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;text.Clear();if(html!=null&&!await html.CloseAsync())MessageBox.Show(this,"WebView2の終了後、一時領域の削除を完了できませんでした。完全消去は保証できません。\n"+html.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);closing=true;Close();};
+        FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;text.Clear();if(html!=null&&!await html.CloseAsync())MessageBox.Show(this,"WebView2の終了後、一時領域の削除を完了できませんでした。完全消去は保証できません。\n"+html.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);closing=true;BeginInvoke(new Action(Close));};
     }
     protected override void OnFontSizeChanged(){html?.SetDisplaySize(UiSize);}
     async Task Save()
@@ -65,6 +65,6 @@ public sealed class ViewerForm : AppForm
     {
         string details="本文・鍵：XChaCha20-Poly1305\r\n共通鍵長：256bit / nonce長：192bit / 認証タグ：128bit\r\nパスワード鍵導出：Argon2id v1.3 (ARGON2ID13)\r\nメモリ：256MiB / 演算パラメータ：3 / Salt：16byte\r\n鍵管理：暗号化ごとに新しいランダムDEK、パスワード由来KEKでDEKを暗号化\r\n用途別鍵：libsodium crypto_kdfによる本文・添付の鍵分離\r\n添付：crypto_secretstream_xchacha20poly1305、原則1MiBチャンク\r\n改ざん検出：マニフェストの認証、添付暗号文のSHA-256・構造検査、保存時の全チャンク認証とTAG_FINAL検証\r\n\r\nSHA-512：配布EXE全体の整合性確認用です。暗号方式そのものではなく、チェックサム単独では送信者の真正性を証明できません。\r\n短いパスワードは推測攻撃に弱いため、長いパスフレーズを推奨します。\r\n暗号化データの認証は送信者本人の証明とは異なります。\r\n\r\nコピー禁止は通常UIの制限です。スクリーンショット、OCR、外部カメラ、プロセスメモリ解析を防止するDRMではありません。\r\n表示・コピー・保存後の情報の完全消去は保証できません。";
         var version=typeof(ViewerForm).Assembly.GetName().Version!;details+=$"\r\n\r\nCipherCapsule v{version.Major}.{version.Minor}.{version.Build}\r\nGitHub：https://github.com/SyuzouinYukyu/CipherCapsule";
-        using var f=new ReadOnlyDialog("暗号アルゴリズム仕様",details,new Size(920,650));f.ShowDialog(this);
+        using var f=new SpecificationDialog(details,new Size(920,650));f.ShowDialog(this);
     }
 }

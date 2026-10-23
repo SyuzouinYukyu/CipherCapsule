@@ -17,6 +17,7 @@ public static class Container
     public static (long Offset, long Length) Locate(FileStream s)
     {
         if (s.Length < 256) throw new InvalidDataException("有効な暗号化EXEではありません。");
+        s.Position=0;if(Read(s,8).AsSpan().SequenceEqual(Magic))return LocateCcap(s);
         s.Position = 0; byte[] dos = Read(s, 64);
         if (dos[0] != 'M' || dos[1] != 'Z') throw new InvalidDataException();
         long pe = U32(dos, 60);
@@ -52,6 +53,16 @@ public static class Container
         }
         throw new InvalidDataException("暗号化コンテナーを検出できません。");
     }
+    public static (long Offset,long Length) LocateCcap(FileStream s)
+    {
+        if(s.Length<HeaderSize+16+FooterSize)throw new InvalidDataException("有効なCCAPファイルではありません。");
+        s.Position=0;if(!Read(s,8).AsSpan().SequenceEqual(Magic))throw new InvalidDataException("CCAP形式ではありません。自己復号EXEは直接起動してください。");
+        s.Position=s.Length-FooterSize;byte[] f=Read(s,FooterSize);long length=I64(f,24);
+        if(!f.AsSpan(0,8).SequenceEqual(EndMagic)||U32(f,8)!=1||U32(f,12)!=0||I64(f,16)!=0||length<HeaderSize+16||length>Limits.Total+60L*1024*1024||length!=s.Length-FooterSize||!CryptographicOperations.FixedTimeEquals(SHA256.HashData(f.AsSpan(0,32)),f.AsSpan(32)))throw new InvalidDataException("CCAPの末尾・長さを検証できません。");
+        return (0,length);
+    }
+    public static void GenerateCcap(string output,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true)
+        =>Generate(Stream.Null,output,body,kind,paths,password,overwrite,ct,progress,allowCopy);
     public static void Generate(Stream template, string output, string body, BodyKind kind, IReadOnlyList<string> paths, byte[] password, bool overwrite, CancellationToken ct, IProgress<CapsuleProgress>? progress = null, bool allowCopy = true)
     {
         Limits.Password(Limits.Utf8.GetString(password)); Limits.BodyText(body); Limits.Inputs(paths);
@@ -112,12 +123,12 @@ public static class Container
         }
         finally { AtomicFile.Delete(temp); Sodium.Wipe(dek); Sodium.Wipe(kek); Sodium.Wipe(mk); Sodium.Wipe(plain); }
     }
-    public static UnlockedCapsule Unlock(string path, byte[] password, CancellationToken ct, IProgress<CapsuleProgress>? progress=null)
+    public static UnlockedCapsule Unlock(string path, byte[] password, CancellationToken ct, IProgress<CapsuleProgress>? progress=null,bool ccapOnly=false)
     {
         FileStream? s=null; byte[]? kek=null,dek=null,mk=null,plain=null;
         try
         {
-            Limits.Password(Limits.Utf8.GetString(password),false); s=Open(path); var loc=Locate(s); s.Position=loc.Offset;
+            Limits.Password(Limits.Utf8.GetString(password),false); s=Open(path); var loc=ccapOnly?LocateCcap(s):Locate(s); s.Position=loc.Offset;
             byte[] h=Read(s,HeaderSize);
             if (!h.AsSpan(0,8).SequenceEqual(Magic) || U32(h,8)!=1 || U32(h,12)!=1 || I64(h,16)!=3 || I64(h,24)!=256L*1024*1024 || U32(h,160)>Limits.Count || U32(h,164)!=Limits.Chunk || I64(h,168)!=0) throw new InvalidDataException();
             long mo=I64(h,144),ml=I64(h,152);

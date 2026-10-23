@@ -20,7 +20,7 @@ internal static partial class Program
             web.CoreWebView2.NavigationCompleted+=(_,e)=>completions.Add(new{e.NavigationId,e.IsSuccess,status=e.WebErrorStatus.ToString()});
             for(int i=0;i<64;i++){form.SetSize(9+i%9);await Task.Delay(3);}
             await Task.Delay(2500);
-            var record=new{source="Current ViewerForm / HtmlView zoom diagnostic harness",fontChanges=64,navigationStarts=starts.Count,completions,view.Rendered,errorLabels=view.Controls.OfType<Label>().Select(x=>x.Text).ToArray()};
+            var record=new{source="Unmodified v1.1.1 ViewerForm / HtmlView",fontChanges=64,navigationStarts=starts.Count,completions,view.Rendered,errorLabels=view.Controls.OfType<Label>().Select(x=>x.Text).ToArray()};
             string json=JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true});File.WriteAllText(Path.Combine(Root,"../Work/zoom-before.json"),json);Console.WriteLine(json);
         }catch(Exception e){Console.WriteLine(e);throw;}finally{form.Close();}};
         Application.Run(form);

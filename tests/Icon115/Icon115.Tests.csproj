@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><UseWindowsForms>false</UseWindowsForms><PublishSingleFile>false</PublishSingleFile></PropertyGroup>
+  <ItemGroup><Compile Include="../../src/Builder/CcapIconRegistration.cs" Link="CcapIconRegistration.cs" /><ProjectReference Include="../../src/Core/Core.csproj" /></ItemGroup>
+</Project>

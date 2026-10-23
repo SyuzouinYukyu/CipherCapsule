@@ -25,6 +25,9 @@ internal static partial class Program
         if(runRoot!=null){string path=Path.GetFullPath(runRoot),boundary=Path.GetFullPath(Path.Combine(Root,"../Work"))+Path.DirectorySeparatorChar;if(!path.StartsWith(boundary,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Test run must be inside this version's Work folder");Work=Path.Combine(path,"selftests");ResultFolder=Path.Combine(path,"results");Directory.CreateDirectory(Work);}
         if(args.Contains("--zoom-before")) { RunZoomBefore(); return 0; }
         if(args.Contains("--v113")) { RunV113(); Finish("v113-results.json"); return failed==0?0:1; }
+        if(args.Contains("--ccap114")) { RunCcap114(); Finish("ccap114-results.json"); return failed==0?0:1; }
+        if(args.Contains("--ccap-compat-recheck114")) { RunCcapCompatRecheck114(); Finish("ccap-compat-recheck114-results.json"); return failed==0?0:1; }
+        if(args.Contains("--ccap-gui114")) { RunCcapGui114(); Finish("ccap-gui114-results.json"); return failed==0?0:1; }
         if(args.Contains("--viewer-folder113")) { RunViewerFolder113(); Finish("viewer-folder113-results.json"); return failed==0?0:1; }
         if(args.Contains("--viewer-folder-dpi113")) { RunViewerFolderDpi113(); Finish("viewer-folder-dpi113-results.json"); return failed==0?0:1; }
         if(args.Contains("--folder113")) { RunFolder113(); Finish("folder113-results.json"); return failed==0?0:1; }

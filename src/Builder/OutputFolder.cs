@@ -15,6 +15,12 @@ public static class OutputFolder
         info.ArgumentList.Add(directory);return info;
     }
     public static string? TryOpen(string completedOutputPath)=>TryOpen(completedOutputPath,info=>{using var process=Process.Start(info)??throw new IOException();});
+    public static string? OpenAndClose(string completedOutputPath,Action close,Action<ProcessStartInfo>? start=null)
+    {
+        string? warning=start==null?TryOpen(completedOutputPath):TryOpen(completedOutputPath,start);
+        if(warning==null)close();
+        return warning;
+    }
     public static string? TryOpen(string completedOutputPath,Action<ProcessStartInfo> start)
     {
         try{start(StartInfo(completedOutputPath));return null;}
