@@ -1,4 +1,4 @@
-# CipherCapsule v1.1.2 — 第三者コンポーネントと対応ソース
+# CipherCapsule v1.1.3 — 第三者コンポーネントと対応ソース
 
 CipherCapsule自身のソースコードはGPL-2.0-or-laterで提供します。本文は`LICENSE`、プロジェクトの著作権表示と条件は`licenses/CipherCapsule-license.txt`を参照してください。
 第三者コンポーネントを一律に再ライセンスするものではありません。

@@ -26,7 +26,7 @@ internal static partial class Program
             Test("malformed or duplicate reveal key never resets old settings",()=>{foreach(string value in new[]{"2","-1","true","garbage","", "1\nPasswordRevealed=0"}){File.WriteAllText(ini,legacy+"PasswordRevealed="+value+"\n");var s=SettingsType.Load();Check(!s.PasswordRevealed&&s.X==151&&s.Font==17&&s.Kind==1);}});
             Test("revealed state atomic save and restore",()=>{new SettingsType{PasswordRevealed=true}.Save();Check(SettingsType.Load().PasswordRevealed&&File.ReadAllText(ini).Contains("PasswordRevealed=1"));});
             Test("masked state atomic save and restore",()=>{new SettingsType{PasswordRevealed=false}.Save();Check(!SettingsType.Load().PasswordRevealed&&File.ReadAllText(ini).Contains("PasswordRevealed=0"));});
-            Test("INI has only public window settings and one visibility boolean",()=>{var keys=File.ReadAllLines(ini).Where(x=>x.Contains('=')).Select(x=>x.Split('=')[0]).ToHashSet();Check(keys.SetEquals(new[]{"X","Y","Width","Height","Font","Kind","PasswordRevealed"}));});
+            Test("INI has only public window settings and one visibility boolean",()=>{var keys=File.ReadAllLines(ini).Where(x=>x.Contains('=')).Select(x=>x.Split('=')[0]).ToHashSet();Check(keys.SetEquals(new[]{"X","Y","Width","Height","Font","Kind","PasswordRevealed","LastOutputDirectory"}));});
             using var builder=new BuilderType();var pw=Field<BuilderPassword>(builder,"password");var generate=Field<Button>(builder,"generate");var cancel=Field<Button>(builder,"cancel");
             builder.Shown+=(_,_)=>{try{
                 Test("Builder default masked confirmation and generate disabled",()=>Check(!pw.Revealed&&pw.Primary.UseSystemPasswordChar&&pw.Confirm.Visible&&!generate.Enabled&&!cancel.Enabled));
@@ -41,7 +41,7 @@ internal static partial class Program
                 var busy=typeof(BuilderType).GetMethod("SetBusy",BindingFlags.NonPublic|BindingFlags.Instance)!;busy.Invoke(builder,[true]);
                 Test("busy state disables generate and enables cancel",()=>Check(!generate.Enabled&&cancel.Enabled&&!pw.Enabled));busy.Invoke(builder,[false]);
                 Test("idle state restores validity and retains inputs",()=>Check(generate.Enabled&&!cancel.Enabled&&pw.Primary.Text=="Visibility-only dummy 112"));
-                using var dialog=(SaveFileDialog)typeof(BuilderType).GetMethod("CreateSaveDialog",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,null)!;
+                using var dialog=(SaveFileDialog)typeof(BuilderType).GetMethod("CreateSaveDialog",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(builder,null)!;
                 Test("SaveFileDialog uses documents and exe defaults with overwrite prompt",()=>Check(dialog.FileName=="SecureMessage.exe"&&dialog.InitialDirectory==Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)&&dialog.DefaultExt=="exe"&&dialog.AddExtension&&dialog.OverwritePrompt));
                 pw.SetRevealed(true);
             }catch(Exception e){Test("Builder v112 runtime",()=>throw e);}finally{builder.Close();}};

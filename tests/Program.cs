@@ -16,11 +16,18 @@ internal static partial class Program
     [STAThread] static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if(args.Contains("--verify-gui113"))return VerifyGui113();
+        if(args.Contains("--inspect-gui113"))return InspectGui113();
+        if(args.Contains("--prepare-viewer-folder-gui113"))return PrepareViewerFolderGui113();
         if(args.Contains("--exit-trace"))return TraceUnexpectedExit();
         Work=Path.GetFullPath(Path.Combine(Root,"../Work/selftests")); Directory.CreateDirectory(Work); Template=Path.Combine(Root,"templates","CipherCapsule_Viewer.exe");
         string? runRoot=args.FirstOrDefault(x=>x.StartsWith("--run-root="))?[11..];
         if(runRoot!=null){string path=Path.GetFullPath(runRoot),boundary=Path.GetFullPath(Path.Combine(Root,"../Work"))+Path.DirectorySeparatorChar;if(!path.StartsWith(boundary,StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Test run must be inside this version's Work folder");Work=Path.Combine(path,"selftests");ResultFolder=Path.Combine(path,"results");Directory.CreateDirectory(Work);}
         if(args.Contains("--zoom-before")) { RunZoomBefore(); return 0; }
+        if(args.Contains("--v113")) { RunV113(); Finish("v113-results.json"); return failed==0?0:1; }
+        if(args.Contains("--viewer-folder113")) { RunViewerFolder113(); Finish("viewer-folder113-results.json"); return failed==0?0:1; }
+        if(args.Contains("--viewer-folder-dpi113")) { RunViewerFolderDpi113(); Finish("viewer-folder-dpi113-results.json"); return failed==0?0:1; }
+        if(args.Contains("--folder113")) { RunFolder113(); Finish("folder113-results.json"); return failed==0?0:1; }
         if(args.Contains("--v112")) { RunV112(); Finish("v112-results.json"); return failed==0?0:1; }
         if(args.Contains("--layout")) { RunLayout(); Finish("layout-results.json"); return failed==0?0:1; }
         if(args.Contains("--html")) { RunHtml(); Finish("html-results.json"); return failed==0?0:1; }

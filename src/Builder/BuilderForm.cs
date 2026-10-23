@@ -18,10 +18,12 @@ public sealed class BuilderForm : AppForm
     readonly Button generate,cancel;readonly Panel editArea=new(){Dock=DockStyle.Fill};readonly List<string> paths=[];readonly ToolTip tips=new();
     readonly TableLayoutPanel root=new(){Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(12)};
     readonly TableLayoutPanel config=new(){Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1};CancellationTokenSource? cts;bool busy,closing,closePending;
+    string lastOutputDirectory=Settings.Documents;
     public BuilderForm()
     {
-        Text="CipherCapsule v1.1.2";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
+        Text="CipherCapsule v1.1.3";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
         var settings=Settings.Load();SetSize(settings.Font);Size=new Size(Math.Max(900,settings.Width),Math.Max(960,settings.Height));
+        lastOutputDirectory=settings.LastOutputDirectory;
         password.SetRevealed(settings.PasswordRevealed);
         var rect=new Rectangle(settings.X,settings.Y,Width,Height);if(Screen.AllScreens.Any(s=>Rectangle.Intersect(s.WorkingArea,rect).Width>=200&&Rectangle.Intersect(s.WorkingArea,rect).Height>=100)){StartPosition=FormStartPosition.Manual;Location=rect.Location;}
         mode.Items.AddRange(["TEXT","HTML"]);mode.SelectedIndex=settings.Kind;
@@ -44,7 +46,7 @@ public sealed class BuilderForm : AppForm
         editor.DragDrop+=async(_,e)=>{if(!busy&&e.Data?.GetData(DataFormats.FileDrop) is string[] p&&p.Length==1)await ReadBody(p[0]);};
         files.DragDrop+=(_,e)=>{if(!busy&&e.Data?.GetData(DataFormats.FileDrop) is string[] p)AddFiles(p);};
         FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;bool cleaned=await htmlEditor.CloseAsync();if(!cleaned)MessageBox.Show(this,"WebView2の一時領域を削除できませんでした。完全消去は保証できません。\n"+htmlEditor.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-            try{var b=WindowState==FormWindowState.Normal?Bounds:RestoreBounds;new Settings{X=b.X,Y=b.Y,Width=b.Width,Height=b.Height,Font=UiSize,Kind=mode.SelectedIndex,PasswordRevealed=password.Revealed}.Save();}catch{MessageBox.Show(this,"設定を保存できません。EXE配置先の書込み権限を確認してください。","設定保存",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            SaveSettings();
             password.ClearSecrets();editor.Clear();closing=true;Close();};
         SwitchMode();UpdateRun();
     }
@@ -76,15 +78,37 @@ public sealed class BuilderForm : AppForm
             workFolder=Path.GetDirectoryName(dest)!;previousTemporary=Directory.EnumerateFiles(workFolder,".cc-*.tmp").ToHashSet(StringComparer.OrdinalIgnoreCase);cts=new();result.Clear();var progress=new Progress<CapsuleProgress>(x=>{stage=x.Stage;status.Text=x.Stage+(x.Total>1?$" {Display.Size(x.Done)} / {Display.Size(x.Total)}":"");bar.Value=(int)Math.Clamp(x.Done*1000/Math.Max(1,x.Total),0,1000);});
             string[] inputs=paths.ToArray();byte[] pw=p;bool sum=checksum.Checked,copy=allowCopy.Checked;stage="暗号化";
             var package=await Task.Run(()=>{using var template=Assembly.GetExecutingAssembly().GetManifestResourceStream("ViewerTemplate")??throw new IOException();return PackageWriter.Generate(template,dest,body,kind,inputs,pw,sum,true,cts.Token,progress,copy);});
+            lastOutputDirectory=Path.GetDirectoryName(package.Path)!;SaveSettings();
             watch.Stop();string message=$"暗号化が完了しました。\r\n\r\nファイル名：{Path.GetFileName(package.Path)}\r\n保存先：{Path.GetDirectoryName(package.Path)}\r\nフルパス：{package.Path}\r\nファイルサイズ：{Display.Size(package.Size)} ({package.Size:N0} B)\r\n処理時間：{Display.Time(watch.Elapsed)}\r\nSHA-512：{(package.Sha512!=null?"正常に生成しました。":"出力しない設定です。")}\r\nSHA-256：{package.Sha256}";
-            result.Text=message;status.Text="暗号化完了。パスワードと編集内容はこのセッション内で保持しています。";ResultDialog(message,"暗号化成功");
+            result.Text=message;status.Text="暗号化完了。パスワードと編集内容はこのセッション内で保持しています。";ResultDialog(message,"暗号化成功",package.Path);
         }
         catch(Exception ex){watch.Stop();string explanation=ex is OperationCanceledException?"処理をキャンセルしました。":ex is ArgumentException?ex.Message:ex is UnauthorizedAccessException?"アクセスが拒否されました。保存先の書込み権限とファイルの使用状況を確認してください。":ex is IOException?"ファイルを処理できません。空き容量・ファイルの使用状況・入力ファイルの変更を確認してください。"+ (ex.Message.StartsWith("出力の復元")?"\r\n"+ex.Message:""):"暗号化を完了できません。入力内容と実行環境を確認してください。";
             string cleanup="一時ファイルを作成する前に終了しました。";if(workFolder!=null)try{var remaining=Directory.EnumerateFiles(workFolder,".cc-*.tmp").Where(x=>!previousTemporary.Contains(x)).ToArray();cleanup=remaining.Length==0?"一時ファイルの後始末：残存なしを確認しました。":"一時・退避ファイルが残っています。保管して手動確認してください："+string.Join("、",remaining);}catch{cleanup="一時ファイルの後始末結果を確認できません。保存先を手動確認してください。";}
             string message=$"{(ex is OperationCanceledException?"キャンセル":"暗号化失敗")}\r\n処理：{stage}\r\n原因・対処：{explanation}\r\n経過時間：{Display.Time(watch.Elapsed)}\r\n{cleanup}\r\n入力済みパスワード・編集内容は保持しています。";result.Text=message;status.Text="処理を完了できませんでした。入力内容は保持しています。";ResultDialog(message,"暗号化結果");}
         finally{Sodium.Wipe(p);cts?.Dispose();cts=null;SetBusy(false);}
     }
-    static SaveFileDialog CreateSaveDialog()=>new(){Filter="実行ファイル (*.exe)|*.exe",FileName="SecureMessage.exe",InitialDirectory=Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),DefaultExt="exe",AddExtension=true,OverwritePrompt=true};
-    void ResultDialog(string message,string title){using var f=new AppForm{Text=title,Size=new Size(900,520)};var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(12)};layout.RowStyles.Add(new(SizeType.Percent,100));layout.RowStyles.Add(new(SizeType.AutoSize));layout.Controls.Add(new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,Text=message},0,0);layout.Controls.Add(Button("閉じる",(_,_)=>f.Close()),0,1);f.Controls.Add(layout);f.ShowDialog(this);}
+    SaveFileDialog CreateSaveDialog()=>new(){Filter="実行ファイル (*.exe)|*.exe",FileName="SecureMessage.exe",InitialDirectory=Settings.OutputDirectory(lastOutputDirectory),DefaultExt="exe",AddExtension=true,OverwritePrompt=true};
+    bool SaveSettings()
+    {
+        try{var b=WindowState==FormWindowState.Normal?Bounds:RestoreBounds;new Settings{X=b.X,Y=b.Y,Width=b.Width,Height=b.Height,Font=UiSize,Kind=mode.SelectedIndex,PasswordRevealed=password.Revealed,LastOutputDirectory=lastOutputDirectory}.Save();return true;}
+        catch{MessageBox.Show(this,"設定を保存できません。EXE配置先の書込み権限を確認してください。完成した暗号化EXEと現在の入力内容は保持しています。","設定保存",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}
+    }
+    static ReadOnlyDialog CreateResultDialog(string message,string title,string? completedOutputPath=null)
+    {
+        var f=new ReadOnlyDialog(title,message,new Size(900,520),true);
+        if(completedOutputPath!=null){
+            var open=Button("保存先フォルダを開く",(_,_)=>{string? warning=OutputFolder.TryOpen(completedOutputPath);if(warning!=null)MessageBox.Show(f,warning,"保存先フォルダ",MessageBoxButtons.OK,MessageBoxIcon.Warning);});
+            var group=new FlowLayoutPanel{AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=false,Anchor=AnchorStyles.None,Margin=new Padding(0)};
+            var row=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0)};
+            row.ColumnStyles.Add(new(SizeType.Percent,50));row.ColumnStyles.Add(new(SizeType.AutoSize));row.ColumnStyles.Add(new(SizeType.Percent,50));
+            var layout=f.Controls.OfType<TableLayoutPanel>().Single();layout.Controls.Remove(f.CloseButton);
+            group.Controls.Add(open);group.Controls.Add(f.CloseButton);row.Controls.Add(group,1,0);layout.Controls.Add(row,0,1);
+            void SizeButtons(){int dpi=f.DeviceDpi;int height=(int)Math.Ceiling(40*Math.Max(1,f.UiSize/12f)*dpi/96f);open.MinimumSize=new Size(0,height);f.CloseButton.MinimumSize=new Size(0,height);open.Margin=new Padding(0,0,(int)Math.Ceiling(12*dpi/96f),0);f.CloseButton.Margin=new Padding(0);}
+            SizeButtons();f.FontChanged+=(_,_)=>SizeButtons();f.DpiChanged+=(_,_)=>SizeButtons();
+            f.Content.Select(0,0);f.ActiveControl=f.CloseButton;
+        }
+        return f;
+    }
+    void ResultDialog(string message,string title,string? completedOutputPath=null){using var f=CreateResultDialog(message,title,completedOutputPath);f.ShowDialog(this);}
     void ShowNotices(){var b=new System.Text.StringBuilder();var a=Assembly.GetExecutingAssembly();foreach(string name in a.GetManifestResourceNames().Where(n=>n.StartsWith("License.")).Order()){using var s=a.GetManifestResourceStream(name)!;using var r=new StreamReader(s);b.AppendLine(name[8..]).AppendLine(r.ReadToEnd()).AppendLine();}ResultDialog(b.ToString(),"CipherCapsule — ライセンス・注意事項");}
 }
