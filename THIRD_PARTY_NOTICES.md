@@ -1,4 +1,4 @@
-# CipherCapsule v1.1.7 — 第三者コンポーネントと対応ソース
+# CipherCapsule v1.1.8 — 第三者コンポーネントと対応ソース
 
 CipherCapsule自身のソースコードはGPL-2.0-or-laterで提供します。本文は`LICENSE`、プロジェクトの著作権表示と条件は`licenses/CipherCapsule-license.txt`を参照してください。
 第三者コンポーネントを一律に再ライセンスするものではありません。
@@ -21,7 +21,6 @@ libsodiumの公式署名付きアーカイブと`.minisig`を提供していま�
 NuGet依存関係は各プロジェクトの`packages.lock.json`と`global.json`で管理しています。
 WebView2 Runtime自体はEXEに同梱せず、Microsoftから導入したRuntimeを利用します。
 
-このタグのアプリケーションソース、ローカル編集統合、ビルド入力、上流対応ソースは、GitHubのタグ付きソースアーカイブから一括取得できます。
-Releaseには同じライセンス資料のZIPも添付しています。これらの著作権表示と条件を再配布時にも保持してください。
+このリポジトリにはアプリケーションソース、ローカル編集統合、ビルド入力、上流対応ソースを保持しています。これらの著作権表示と条件を再配布時にも保持してください。
 
 `licenses/CipherCapsule-license.txt`内の`Source`は元の開発フォルダー構成を指します。このリポジトリでは同じ内容を直下へ配置し、`BUILDING.md`の補助スクリプトで元の構成へコピーしてビルドします。

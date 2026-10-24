@@ -9,9 +9,11 @@ namespace CipherCapsule.Builder;
 public sealed class HtmlEditor : UserControl
 {
     readonly WebView2 web=new(){Dock=DockStyle.Fill};readonly TextBox code=new(){Multiline=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,AcceptsReturn=true,AcceptsTab=true,MaxLength=Limits.Body,AccessibleName="HTMLコード"};
-    readonly TabControl tabs=new(){Dock=DockStyle.Fill};readonly BrowserProfile profile=new();readonly SemaphoreSlim sync=new(1,1);
+    readonly TabControl tabs=new(){Dock=DockStyle.Fill};readonly BrowserProfile profile=new();
+    readonly EditorSwitchQueue switches;readonly Queue<EditorSwitchTrace> switchTrace=new();long scriptRevision;
+    readonly SemaphoreSlim uiFontSync=new(1,1);long uiFontRevision;
     readonly Dictionary<string,byte[]> assets=[];readonly List<MemoryStream> responses=[];
-    readonly string origin="https://editor.invalid";bool ready,closed,switching;string pending="";int previous;Task? initialization;Task<bool>? cleanup;
+    readonly string origin="https://editor.invalid";bool ready,closed,switching;string pending="";Task? initialization;Task<bool>? cleanup;
     [System.ComponentModel.Browsable(false),System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Func<string[],Task>? FileDropRequested{get;set;}
     public string CleanupFailure=>profile.FailureReason;
@@ -19,7 +21,10 @@ public sealed class HtmlEditor : UserControl
     public HtmlEditor()
     {
         Dock=DockStyle.Fill;var visual=new TabPage("ビジュアル");var source=new TabPage("コード");visual.Controls.Add(web);source.Controls.Add(code);tabs.TabPages.AddRange([visual,source]);Controls.Add(tabs);
+        switches=new(()=>tabs.SelectedIndex,PrepareSwitch,CommitSwitch,SwitchBusy,SwitchFailed,RememberSwitch);
         tabs.Selecting+=async(_,e)=>{if(switching)return;e.Cancel=true;await Switch(e.TabPageIndex);};
+        // Clicking the currently visible tab while a request is pending must also cancel that request.
+        tabs.MouseDown+=async(_,e)=>{if(e.Button!=MouseButtons.Left||switching)return;for(int i=0;i<tabs.TabCount;i++)if(tabs.GetTabRect(i).Contains(e.Location)){await Switch(i);break;}};
         Load+=async(_,_)=>{try{initialization??=Initialize();await initialization;}catch(Exception ex){AppForm.Error(this,ex);}};
     }
     async Task Initialize()
@@ -78,7 +83,19 @@ public sealed class HtmlEditor : UserControl
         string? data=SafeHtml.ImageData(prefix+Convert.ToBase64String(File.ReadAllBytes(d.FileName)));if(data==null)throw new ArgumentException("画像を検証できません。PNG/JPEG、最大4096px、総画素数4Mi以内で指定してください。");
         await web.CoreWebView2.ExecuteScriptAsync("window.ccImageCallback?.("+JsonSerializer.Serialize(data)+",{alt:''});window.ccImageCallback=null;");
     }
-    async Task SetVisual(string value){await web.CoreWebView2.ExecuteScriptAsync("tinymce.activeEditor.setContent("+JsonSerializer.Serialize(value)+");");}
+    async Task<string> EditorScript(string command,string? html=null,CancellationToken ct=default)
+    {
+        if(closed||web.CoreWebView2==null)throw new IOException("HTMLエディターを使用できません。");
+        ct.ThrowIfCancellationRequested();long revision=Interlocked.Increment(ref scriptRevision);
+        long expires=DateTimeOffset.UtcNow.AddSeconds(6).ToUnixTimeMilliseconds();
+        string script="window.ccEditorBridge.run("+JsonSerializer.Serialize(command)+","+JsonSerializer.Serialize(revision)+","+JsonSerializer.Serialize(expires)+","+JsonSerializer.Serialize(html)+");";
+        string reply=await web.CoreWebView2.ExecuteScriptAsync(script).WaitAsync(TimeSpan.FromSeconds(6),ct);
+        ct.ThrowIfCancellationRequested();
+        using var json=JsonDocument.Parse(reply);var result=json.RootElement;
+        if(result.ValueKind!=JsonValueKind.Object||!result.TryGetProperty("ok",out var ok)||ok.ValueKind!=JsonValueKind.True||!result.TryGetProperty("value",out var value)||value.ValueKind!=JsonValueKind.String)throw new IOException("HTMLエディターの応答を検証できません。内容は変更せず再試行できます。");
+        return value.GetString()!;
+    }
+    async Task SetVisual(string value,CancellationToken ct=default){await EditorScript("write",value,ct);}
     async Task ClipboardAction(string action)
     {
         if(!ready)return;
@@ -95,20 +112,60 @@ public sealed class HtmlEditor : UserControl
         string? link=action=="paste"?SafeHtml.SafeUrl(plain):null;
         await web.CoreWebView2.ExecuteScriptAsync("(()=>{const e=tinymce.activeEditor;const url="+JsonSerializer.Serialize(link)+";e.focus();e.undoManager.transact(()=>{if(url&&!e.selection.isCollapsed())e.execCommand('mceInsertLink',false,{href:url});else e.insertContent("+JsonSerializer.Serialize(markup)+");});})()");
     }
-    async Task ApplyUiFont(){if(ready&&!closed){float size=FindForm() is AppForm f?f.UiSize:12;string css=".tox .tox-tbtn,.tox .tox-mbtn,.tox .tox-listboxfield .tox-listbox--select,.tox .tox-statusbar{font-size:"+size.ToString(System.Globalization.CultureInfo.InvariantCulture)+"pt}.tox .tox-mbtn{width:auto;max-width:none;min-width:max-content;white-space:nowrap;flex-shrink:0;height:auto;min-height:28px}.tox .tox-mbtn__select-label{white-space:nowrap}.tox .tox-statusbar{height:auto;min-height:20px;flex-shrink:0}.tox .tox-statusbar__text-container{height:auto;min-height:1.4em;line-height:1.4}.tox .tox-statusbar__path,.tox .tox-statusbar__wordcount,.tox .tox-statusbar__branding{height:auto;line-height:1.4}.tox.tox-tinymce{min-height:280px}body{overflow:auto}";await web.CoreWebView2.ExecuteScriptAsync("(()=>{let s=document.getElementById('cc-ui-font');if(!s){s=document.createElement('style');s.id='cc-ui-font';document.head.appendChild(s);}s.textContent="+JsonSerializer.Serialize(css)+";})()");}}
-    protected override async void OnFontChanged(EventArgs e){base.OnFontChanged(e);if(ready&&!closed)try{await ApplyUiFont();}catch{}}
-    async Task<string> VisualContent()=>JsonSerializer.Deserialize<string>(await web.CoreWebView2.ExecuteScriptAsync("tinymce.activeEditor.getContent()"))??"";
-    public async Task<string> GetContent()=>IsCode?code.Text:ready?await VisualContent():pending;
-    public async Task SetContent(string value){Limits.BodyText(value);pending=value;code.Text=value;if(ready){string clean=SafeHtml.ValidateEditor(value,out bool warning);if(warning)MessageBox.Show(this,"HTMLに不正な構造または危険な要素があります。ビジュアル表示では安全に正規化します。コード原文はコードタブで確認できます。","HTML安全性",MessageBoxButtons.OK,MessageBoxIcon.Warning);await SetVisual(clean);}}
-    public async Task Switch(int index)
+    async Task ApplyUiFont()
     {
-        if(index==previous||index is <0 or >1)return;await sync.WaitAsync();try{
-            if(index==1){code.Text=ready?await VisualContent():pending;}
-            else{string clean=SafeHtml.ValidateEditor(code.Text,out bool warning);if(warning&&MessageBox.Show(this,"HTMLに不正な構造または危険な要素があります。安全に正規化してビジュアルへ切り替えますか？\n「いいえ」ならコードを保持します。","HTML安全性",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return;pending=clean;if(ready)await SetVisual(clean);}
-            switching=true;tabs.SelectedIndex=index;previous=index;switching=false;
-        }finally{sync.Release();}
+        if(!ready||closed)return;
+        long revision=Interlocked.Increment(ref uiFontRevision);
+        await uiFontSync.WaitAsync();
+        try
+        {
+            if(!ready||closed||revision!=uiFontRevision)return;
+            float size=FindForm() is AppForm f?f.UiSize:12;
+            if(!float.IsFinite(size)||size<9||size>17)return;
+            await web.CoreWebView2.ExecuteScriptAsync("window.ccUiScale.apply("+JsonSerializer.Serialize(size)+","+JsonSerializer.Serialize(revision)+");").WaitAsync(TimeSpan.FromSeconds(6));
+        }
+        finally{uiFontSync.Release();}
+    }
+    protected override async void OnFontChanged(EventArgs e){base.OnFontChanged(e);if(ready&&!closed)try{await ApplyUiFont();}catch{}}
+    async Task<string> VisualContent(CancellationToken ct=default)=>await EditorScript("read",ct:ct);
+    public async Task<string> GetContent(){await switches.Idle;return IsCode?code.Text:ready?await VisualContent():pending;}
+    public async Task SetContent(string value)
+    {
+        Limits.BodyText(value);await switches.Idle;pending=value;code.Text=value;
+        if(ready){string clean=SafeHtml.ValidateEditor(value,out bool warning);if(warning)MessageBox.Show(this,"HTMLに不正な構造または危険な要素があります。ビジュアル表示では安全に正規化します。コード原文はコードタブで確認できます。","HTML安全性",MessageBoxButtons.OK,MessageBoxIcon.Warning);await SetVisual(clean);}
+    }
+    public Task Switch(int index)=>switches.Request(index);
+    void SwitchBusy(bool value){if(closed||IsDisposed)return;web.Enabled=!value;code.ReadOnly=value;}
+    async Task<EditorSwitchDraft> PrepareSwitch(int index,CancellationToken ct)
+    {
+        if(closed)throw new OperationCanceledException(ct);
+        if(!ready){initialization??=Initialize();await initialization.WaitAsync(TimeSpan.FromSeconds(6),ct);}
+        ct.ThrowIfCancellationRequested();if(!ready)throw new IOException("HTMLエディターの初期化をお待ちください。");
+        if(index==1)return new(true,await VisualContent(ct));
+        string original=code.Text;string clean=SafeHtml.ValidateEditor(original,out bool warning);
+        if(warning&&MessageBox.Show(this,"HTMLに不正な構造または危険な要素があります。安全に正規化してビジュアルへ切り替えますか？\n「いいえ」ならコードを保持します。","HTML安全性",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return new(false,original);
+        ct.ThrowIfCancellationRequested();await SetVisual(clean,ct);return new(true,clean);
+    }
+    void CommitSwitch(int index,EditorSwitchDraft draft)
+    {
+        int old=tabs.SelectedIndex;string oldCode=code.Text,oldPending=pending;switching=true;
+        try{tabs.SelectedIndex=index;if(tabs.SelectedIndex!=index)throw new IOException("タブを切り替えられませんでした。");if(index==1)code.Text=draft.Html;pending=draft.Html;}
+        catch{code.Text=oldCode;pending=oldPending;tabs.SelectedIndex=old;throw;}
+        finally{switching=false;}
+        if(index==0)_=RefreshSwitchFont();
+    }
+    async Task RefreshSwitchFont(){try{await ApplyUiFont();}catch{}}
+    void RememberSwitch(EditorSwitchTrace value){switchTrace.Enqueue(value);while(switchTrace.Count>24)switchTrace.Dequeue();}
+    void SwitchFailed(Exception error)
+    {
+        if(closed||IsDisposed)return;
+        try{
+            string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CipherCapsule","Diagnostics");Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder,"editor-switch118.json"),JsonSerializer.Serialize(new{version="1.1.8",utc=DateTime.UtcNow,ready,selected=tabs.SelectedIndex,errorType=error.GetType().Name,hresult=error.HResult,events=switchTrace.ToArray()}));
+        }catch{}
+        MessageBox.Show(this,"HTML表示を切り替えられませんでした。編集中の内容は保持しています。初期化・応答を待って、もう一度タブを選択してください。","HTML切替",MessageBoxButtons.OK,MessageBoxIcon.Warning);
     }
     public Task<bool> CloseAsync()=>cleanup??=CloseCore();
-    async Task<bool> CloseCore(){closed=true;if(initialization!=null)try{await initialization.WaitAsync(TimeSpan.FromSeconds(12));}catch(TimeoutException){profile.InitializationTimedOut();return false;}catch{}web.Dispose();foreach(var r in responses)r.Dispose();return await profile.Cleanup();}
-    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;web.Dispose();foreach(var r in responses)r.Dispose();_=profile.Cleanup();}base.Dispose(disposing);}
+    async Task<bool> CloseCore(){closed=true;switches.Stop();if(initialization!=null)try{await initialization.WaitAsync(TimeSpan.FromSeconds(12));}catch(TimeoutException){profile.InitializationTimedOut();return false;}catch{}web.Dispose();foreach(var r in responses)r.Dispose();return await profile.Cleanup();}
+    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;switches.Stop();web.Dispose();foreach(var r in responses)r.Dispose();_=profile.Cleanup();}base.Dispose(disposing);}
 }

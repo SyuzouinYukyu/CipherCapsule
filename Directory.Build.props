@@ -2,7 +2,7 @@
  <PropertyGroup>
   <TargetFramework>net10.0-windows</TargetFramework><RuntimeIdentifier>win-x64</RuntimeIdentifier>
   <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  <Version>1.1.7</Version><Deterministic>true</Deterministic><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  <Version>1.1.8</Version><Deterministic>true</Deterministic><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\Work\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   <BaseOutputPath>$(MSBuildThisFileDirectory)..\Work\bin\$(MSBuildProjectName)\</BaseOutputPath>
   <UseWindowsForms>true</UseWindowsForms><ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

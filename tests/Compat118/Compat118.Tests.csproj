@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><UseWindowsForms>false</UseWindowsForms><PublishSingleFile>false</PublishSingleFile></PropertyGroup><ItemGroup><ProjectReference Include="../../src/Core/Core.csproj"/><ProjectReference Include="../../../Work/compat117/Legacy117.csproj" Aliases="Old117"/></ItemGroup></Project>

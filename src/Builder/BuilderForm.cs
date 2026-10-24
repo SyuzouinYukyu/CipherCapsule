@@ -25,7 +25,7 @@ public sealed class BuilderForm : AppForm
     string lastOutputDirectory=Settings.Documents;
     public BuilderForm()
     {
-        Text="CipherCapsule v1.1.7";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
+        Text="CipherCapsule v1.1.8";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
         var settings=Settings.Load();SetSize(settings.Font);Size=new Size(Math.Max(900,settings.Width),Math.Max(960,settings.Height));
         lastOutputDirectory=settings.LastOutputDirectory;
         password.SetRevealed(settings.PasswordRevealed);
