@@ -159,13 +159,22 @@ public sealed class HtmlEditor : UserControl
     void SwitchFailed(Exception error)
     {
         if(closed||IsDisposed)return;
-        try{
-            string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CipherCapsule","Diagnostics");Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder,"editor-switch118.json"),JsonSerializer.Serialize(new{version="1.1.9",utc=DateTime.UtcNow,ready,selected=tabs.SelectedIndex,errorType=error.GetType().Name,hresult=error.HResult,events=switchTrace.ToArray()}));
-        }catch{}
         MessageBox.Show(this,"HTML表示を切り替えられませんでした。編集中の内容は保持しています。初期化・応答を待って、もう一度タブを選択してください。","HTML切替",MessageBoxButtons.OK,MessageBoxIcon.Warning);
     }
     public Task<bool> CloseAsync()=>cleanup??=CloseCore();
-    async Task<bool> CloseCore(){closed=true;switches.Stop();if(initialization!=null)try{await initialization.WaitAsync(TimeSpan.FromSeconds(12));}catch(TimeoutException){profile.InitializationTimedOut();return false;}catch{}web.Dispose();foreach(var r in responses)r.Dispose();return await profile.Cleanup();}
-    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;switches.Stop();web.Dispose();foreach(var r in responses)r.Dispose();_=profile.Cleanup();}base.Dispose(disposing);}
+    void ReleaseContent()
+    {
+        web.Dispose();foreach(var r in responses)r.Dispose();responses.Clear();
+        pending="";code.Clear();assets.Clear();switchTrace.Clear();
+    }
+    async Task<bool> CloseCore()
+    {
+        closed=true;switches.Stop();bool timedOut=false;
+        if(initialization!=null)try{await initialization.WaitAsync(TimeSpan.FromSeconds(12));}
+        catch(TimeoutException){timedOut=true;profile.InitializationTimedOut();}catch{}
+        // Dispose controllers even after timeout; never leave the visible control alive.
+        ReleaseContent();if(timedOut)return false;
+        return await profile.Cleanup();
+    }
+    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;switches.Stop();ReleaseContent();_=profile.Cleanup();}base.Dispose(disposing);}
 }

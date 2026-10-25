@@ -7,7 +7,19 @@
         "resolved": "1.8.5",
         "contentHash": "BUgFIpmkjwMPi6QneHUHaprjUOGSXoWEF/xi/2seHCpnI8XMHACNiC09rn9qL8jbxrP8jWyJ3DnOjsGvXWNGmw=="
       },
+      "android104": {
+        "type": "Project",
+        "dependencies": {
+          "AngleSharp": "[1.8.5, )"
+        }
+      },
       "core": {
+        "type": "Project",
+        "dependencies": {
+          "AngleSharp": "[1.8.5, )"
+        }
+      },
+      "legacy119": {
         "type": "Project",
         "dependencies": {
           "AngleSharp": "[1.8.5, )"

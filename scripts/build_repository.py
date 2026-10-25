@@ -54,7 +54,7 @@ def main():
     for name in settings:
         shutil.copy2(repository / name, source / name)
     subprocess.run([sys.executable, 'scripts/build.py', '--stage'], cwd=source, check=True)
-    print('Staged outputs: ' + str(run / 'Work/stage'))
+    print('Staged outputs: ' + str(run / 'Work/stage1110'))
     print('The published release EXE has not been replaced.')
 
 if __name__ == '__main__':

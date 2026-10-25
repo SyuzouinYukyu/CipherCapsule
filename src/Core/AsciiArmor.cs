@@ -54,8 +54,10 @@ public static class AsciiArmor
         if(encoded.Length==0||encoded.Length>4*((MaxBinaryBytes+2)/3))throw Invalid();
         byte[] bytes;
         try{bytes=Convert.FromBase64String(encoded.ToString());}catch(FormatException){throw Invalid();}
-        if(bytes.Length>MaxBinaryBytes||Convert.ToBase64String(bytes)!=encoded.ToString())throw Invalid();
-        ValidateContainer(bytes);return bytes;
+        try{
+            if(bytes.Length>MaxBinaryBytes||Convert.ToBase64String(bytes)!=encoded.ToString())throw Invalid();
+            ValidateContainer(bytes);return bytes;
+        }catch{Sodium.Wipe(bytes);throw;}
     }
     public static void ValidateContainer(byte[] b)
     {
@@ -69,49 +71,37 @@ public static class AsciiArmor
     }
 }
 
-/// <summary>Uses existing CCAP crypto unchanged; only encrypted data touches disk.</summary>
+/// <summary>Uses the existing authenticated CCAP writer and reader entirely in memory.</summary>
 public static class ArmorMessages
 {
-    sealed class TemporaryCipher:IDisposable
-    {
-        readonly string directory;
-        public string Path {get;}
-        public TemporaryCipher(string root)
-        {
-            string full=System.IO.Path.GetFullPath(root);Directory.CreateDirectory(full);
-            if((File.GetAttributes(full)&FileAttributes.ReparsePoint)!=0)throw new IOException("一時領域のリンクは使用できません。");
-            directory=System.IO.Path.Combine(full,"message-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
-            Path=System.IO.Path.Combine(directory,"encrypted.ccap");
-        }
-        public void Dispose()
-        {
-            try{File.Delete(Path);Directory.Delete(directory,false);}
-            catch(Exception e)when(e is IOException or UnauthorizedAccessException){throw new IOException("暗号メッセージの一時領域を削除できませんでした。完全消去は保証できません。",e);}
-        }
-    }
-    public static string Encrypt(string text,byte[] password,string temporaryRoot,CancellationToken ct)
+    public static string Encrypt(string text,byte[] password,CancellationToken ct)
     {
         AsciiArmor.ValidateText(text);ct.ThrowIfCancellationRequested();
-        using var temp=new TemporaryCipher(temporaryRoot);
-        Container.GenerateCcap(temp.Path,text,BodyKind.TEXT,Array.Empty<string>(),password,false,ct,allowCopy:true);
-        ct.ThrowIfCancellationRequested();
-        if(new FileInfo(temp.Path).Length>AsciiArmor.MaxBinaryBytes)throw new InvalidDataException("暗号メッセージの容量上限を超えました。");
-        byte[] bytes=File.ReadAllBytes(temp.Path);
-        try{return AsciiArmor.Encode(bytes);}finally{Sodium.Wipe(bytes);}
-    }
-    public static string Decrypt(string armor,byte[] password,string temporaryRoot,CancellationToken ct)
-    {
-        byte[] bytes=AsciiArmor.Decode(armor); // All public structure/size checks precede KDF.
+        using var memory=new MemoryStream();byte[]? bytes=null;
         try
         {
-            ct.ThrowIfCancellationRequested();using var temp=new TemporaryCipher(temporaryRoot);
-            using(var file=new FileStream(temp.Path,FileMode.CreateNew,FileAccess.Write,FileShare.None))file.Write(bytes);
-            using var capsule=Container.Unlock(temp.Path,password,ct,ccapOnly:true);
+            Container.GenerateCcap(memory,text,BodyKind.TEXT,Array.Empty<string>(),password,ct,allowCopy:true);
+            ct.ThrowIfCancellationRequested();
+            if(memory.Length>AsciiArmor.MaxBinaryBytes)throw new InvalidDataException("暗号メッセージの容量上限を超えました。");
+            bytes=memory.ToArray();return AsciiArmor.Encode(bytes);
+        }
+        finally { Sodium.Wipe(bytes);if(memory.TryGetBuffer(out var buffer))Sodium.Wipe(buffer.Array); }
+    }
+    public static string Decrypt(string armor,byte[] password,CancellationToken ct)
+    {
+        byte[] bytes=AsciiArmor.Decode(armor); // Structure/size bounds precede KDF.
+        try
+        {
+            ct.ThrowIfCancellationRequested();using var memory=new MemoryStream(bytes,writable:false);
+            using var capsule=Container.Unlock(memory,password,ct,ccapOnly:true,leaveOpen:true);
             if(capsule.Manifest.Kind!=BodyKind.TEXT||capsule.Manifest.Attachments.Count!=0)throw new InvalidDataException("暗号メッセージはTEXT本文・添付なしだけに対応します。");
             AsciiArmor.ValidateText(capsule.Manifest.Body);ct.ThrowIfCancellationRequested();return capsule.Manifest.Body;
         }
-        finally{Sodium.Wipe(bytes);}
+        finally { Sodium.Wipe(bytes); }
     }
+    // Source compatibility for callers of v1.1.9. No path access occurs.
+    public static string Encrypt(string text,byte[] password,string temporaryRoot,CancellationToken ct)=>Encrypt(text,password,ct);
+    public static string Decrypt(string armor,byte[] password,string temporaryRoot,CancellationToken ct)=>Decrypt(armor,password,ct);
 }
 
 /// <summary>Explicit UI state: generated ciphertext only; never copies plaintext.</summary>
@@ -122,8 +112,8 @@ public sealed class ArmorMessageState
     public bool CanCopy(string displayed)=>generated.Length>0&&string.Equals(generated,displayed,StringComparison.Ordinal);
     public void CipherChanged(){generated="";PlainResult="";}
     public void BeginOperation(){generated="";PlainResult="";}
-    public void EncryptionSucceeded(string armor){_ = AsciiArmor.Decode(armor);generated=armor;PlainResult="";}
+    public void EncryptionSucceeded(string armor){var bytes=AsciiArmor.Decode(armor);Sodium.Wipe(bytes);generated=armor;PlainResult="";}
     public void DecryptionSucceeded(string text){AsciiArmor.ValidateText(text);PlainResult=text;}
     public string CopyGenerated(string displayed)=>CanCopy(displayed)?generated:throw new InvalidOperationException("生成済みの暗号文がありません。");
-    public static void ValidatePaste(string text){_ = AsciiArmor.Decode(text);}
+    public static void ValidatePaste(string text){var bytes=AsciiArmor.Decode(text);Sodium.Wipe(bytes);}
 }

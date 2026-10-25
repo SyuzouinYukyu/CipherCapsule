@@ -107,9 +107,23 @@ Windowsの保護機能を無効化して使用することは推奨しません�
 
 ### パスワードで守る、自己復号型の暗号化メッセージ
 
-**CipherCapsule v1.1.9**
+**CipherCapsule v1.1.10**
 
-## v1.1.9の改良
+## v1.1.10の改良
+
+- CCAPアイコンの自動登録を廃止し、過去の登録は管理記録と現在値を検証して安全な場合だけ元の値へ復元します。既知の登録用ICO・管理JSONも安全を確認して整理します。
+- HTMLエディターの診断JSON自動出力を廃止しました。
+- ASCII Armorの生成・認証付き復号をメモリ内処理に変更し、一時CCAPのディスク書込みを廃止しました。
+- WebView2の専用一時領域について、終了確認後の後処理を改善しました。
+- CCAP、自己復号EXE、暗号アルゴリズムとINI形式、Windows／Androidの共通形式を維持します。
+
+正式EXE：`CipherCapsule_v1.1.10.exe`、174,413,751 bytes、SHA-256 `C9FDFDD616AB08BC27BCE4E5A75EEAD40ACFE7B49B3BD3D34D0B7CF76E760A85`。[v1.1.10 Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.10) · [対応ソース](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.10)。コード署名はありません。Windows SmartScreen等が警告する場合は配布元とSHA-256を確認してください。
+
+この版の開発時検証は新規56件、回帰28件、計84件成功／0件失敗です。正式EXEの起動、ASCII Armor、HTML表示、9～17pt、INI保存、通常終了をWindows GUIで確認しました。Android版との互換性は固定済みAndroid Coreを用いたホスト試験です。今回のAndroid実機相互操作と物理DPI切替は未検証です。他版が使用中の旧WebView2領域は安全のため保持します。
+
+Windows内のすべての痕跡は消去しません。Prefetch・イベントログ等のOS管理記録は削除せず、INI設定は従来どおり保存します。所有元や安全性が不明な旧一時ファイルは無条件削除しません。メモリやストレージの物理的完全消去は保証しません。コピーした内容はOSのクリップボード履歴・同期に残る場合があります。
+
+## v1.1.9の改良（過去版）
 
 独立した「暗号メッセージ」画面を追加しました。UTF-8で最大16KiBのTEXT本文をCipherCapsule ASCII Armor暗号文に変換し、利用者の明示的な「コピー」「貼り付け」でWindows／Android間へ送受信できます。日本語・絵文字・改行を保持します。既存CCAP全体をBase64化する独自形式で、OpenPGP／PGPとは互換性がありません。[共通形式と制限](ASCII_ARMOR.md)を参照してください。
 
@@ -135,16 +149,16 @@ Argon2id、XChaCha20-Poly1305、CCAPコンテナー構造、通常の自己復�
 
 「暗号アルゴリズム仕様」内のGitHub URLをクリックすると、Windowsの既定ブラウザーで公式リポジトリを開けます。URLは固定のHTTPSのみ。ブラウザー起動に失敗した場合は日本語で警告し、仕様画面を継続利用できます。暗号化成功ダイアログの「保存先フォルダを開く」は、フォルダ起動成功時に成功ダイアログも閉じ、失敗時は警告と元の画面を保持します。初期全選択なし、先頭表示、選択・コピー・スクロールは維持します。
 
-### 前回公開v1.1.3からの累積変更
+### v1.1.7当時のv1.1.3からの累積変更
 
 - Viewerを含まない小容量の`.ccap`を追加。既存の認証付き暗号コンテナーを利用し、Builder本体でTEXT／HTML・添付を復号閲覧します。
 - 「自己展開アーカイブの作成」はONで自己復号EXE、OFFでCCAP。INIのOutputFormatを引き継ぎます。
 - SHA-512の右隣にSHA-256出力を追加。EXE／CCAP全体の`.sha512`／`.sha256`を独立選択でき、通常エラー時には出力をまとめて復元します。
 - CCAPはBuilder内の本文欄・添付一覧・ボタン・入力欄・余白・HTML編集領域へのD&Dで復号を優先。従来の普通のTXT読込み・添付追加も維持します。
-- CCAPアイコンはBuilder起動時に現在ユーザーの`.ccap/DefaultIcon`へ自動登録し、生成EXEと同じアイコンを表示します。設定用選択ボタンやD&D専用案内文はありません。既定の起動アプリやUserChoiceは変更しません。
+- v1.1.7当時、CCAPアイコンはBuilder起動時に現在ユーザーの`.ccap/DefaultIcon`へ自動登録し、生成EXEと同じアイコンを表示します。設定用選択ボタンやD&D専用案内文はありません。既定の起動アプリやUserChoiceは変更しません。
 - CCAPのファイル選択・起動引数、入力保持、モーダルViewerの通常終了に対応。HTMLリンク・コピー制御・添付保存などは既存コードを共有します。
 
-CCAPのダブルクリック起動を希望する場合は、Windowsの「プログラムから開く」で本EXEを手動選択してください。関連付けの自動変更は行いません。アイコン設定は終了後も残り、別PCではそのPCでBuilderを起動する必要があります。
+CCAPのダブルクリック起動を希望する場合は、Windowsの「プログラムから開く」で本EXEを手動選択してください。関連付けの自動変更は行いません。v1.1.7当時のアイコン設定は終了後も残りました。v1.1.10では自動登録を廃止し、条件を満たす旧登録を安全に復元します。
 
 | 形式 | 閲覧方法 | 容量 |
 |---|---|---|
@@ -153,7 +167,7 @@ CCAPのダブルクリック起動を希望する場合は、Windowsの「プロ
 
 v1.1.4の同内容測定例：本文のみ EXE 52,739,663 bytes／CCAP 382 bytes、複数添付 EXE 52,740,275 bytes／CCAP 994 bytes。旧版の測定値で、すべてのメッセージの圧縮率を保証しません。
 
-対応ソース：[v1.1.9](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.9)。配布：[Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.9)。[ビルド手順](BUILDING.md)、[第三者ライセンス](THIRD_PARTY_NOTICES.md)。
+現行の対応ソース：[v1.1.10](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.10)。配布：[Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.10)。[ビルド手順](BUILDING.md)、[第三者ライセンス](THIRD_PARTY_NOTICES.md)。
 
 CipherCapsuleは、TEXT・HTML形式のメッセージと複数の添付ファイルを暗号化し、**自己復号EXEまたは小容量のCCAPファイル**として出力するWindows用ソフトウェアです。
 
@@ -497,7 +511,7 @@ HTML編集・HTML表示にはMicrosoft Edge WebView2 Runtimeが必要です。
 
 ## ✉️ 暗号化メッセージを作成する
 
-1. `CipherCapsule_v1.1.9.exe`を起動します。
+1. `CipherCapsule_v1.1.10.exe`を起動します。
 2. メッセージ形式としてTEXTまたはHTMLを選択します。
 3. 本文を入力します。
 4. 必要に応じて添付ファイルを登録します。
@@ -586,7 +600,7 @@ v1.1.1では、.NETのSingleFile圧縮機能を利用することで、Viewerを
 
 継承記録はv1.1.4の333件、アイコン・D&D関連68件、チェックサム関連22件（各失敗0）。これらを今回の全件再実行結果や、単一の新規合計として扱っていません。v1.1.3以前の実GUI実績も新機能の手動検証に読み替えません。
 
-**仕様内GitHubリンクは、利用者の手動操作で既定ブラウザーが開くことを確認済みです。** フォルダ起動後の成功ダイアログ自動終了、Explorerアイコン・全画面D&D等は手動確認待ちです。 実モニターのDPI切替も未実施です。v1.1.2検証時のSC_CLOSE送信元未特定という診断事項は解決済みと扱いません。新しい機能の確認は利用者が手動で行い、開発・公開工程でデスクトップ入力の自動操作は行いません。
+v1.1.10の正式EXEでは、暗号化・復号、HTMLプレビュー、通常終了をGUIで確認しました。物理DPI切替は未検証です。
 
 これらは開発時点のテスト結果であり、第三者による正式なセキュリティ認証、暗号学的安全性の数学的証明、すべての端末での動作保証を意味するものではありません。
 
@@ -604,7 +618,7 @@ v1.1.1では、.NETのSingleFile圧縮機能を利用することで、Viewerを
 | Shared | WebView2表示、GUI共通処理 |
 | Tests | 暗号処理・HTML・GUI関連試験 |
 
-v1.1.9で使用する主な依存関係：
+v1.1.10で継承する主な依存関係：
 
 - .NET SDK 10.0.402
 - libsodium 1.0.22

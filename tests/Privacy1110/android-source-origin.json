@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/SyuzouinYukyu/CipherCapsule-for-Android",
+  "commit": "590fe5603617c2930c28125926c9415ed6daccfb",
+  "git_blobs": {
+    "AsciiArmor.cs": "9949275173f6de8e42ab88d1de4a76176e94cc15",
+    "Container.cs": "2397d062816955a43bbf0fceec657b375a9717eb",
+    "FilePolicy.cs": "b3b616bf1b14ec47bcfee0f7f24a5d0dabdd4235",
+    "KeyMemoryException.cs": "f783d2f715eb514bb674a1c418d46ecbd424ba8a",
+    "Models.cs": "e6dcbdf829f8bcd7bc8e4e279220fe1183d9df00",
+    "SafeHtml.cs": "1aca4d7ee18dbb91425a07105d341e823f24bf8e",
+    "Sodium.cs": "0a26a0368b944b5a94dbad20716163274139d836",
+    "StreamContainer.cs": "58ec4050c6e9eadde84edc03abf6c9771b03c748"
+  },
+  "execution": "portable Core on Windows host only; not an Android APK build"
+}

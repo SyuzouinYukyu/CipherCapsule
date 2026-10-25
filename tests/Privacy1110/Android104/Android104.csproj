@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>Android104</AssemblyName><UseWindowsForms>false</UseWindowsForms></PropertyGroup><ItemGroup><PackageReference Include="AngleSharp" Version="1.8.5" /></ItemGroup></Project>

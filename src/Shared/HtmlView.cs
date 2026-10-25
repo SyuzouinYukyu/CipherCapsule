@@ -48,7 +48,7 @@ public sealed class HtmlView : UserControl
                 };c.NavigationCompleted+=(_,e)=>{if(!closed&&navigationId!=0&&e.NavigationId==navigationId){Rendered=e.IsSuccess;if(e.IsSuccess){if(failureLabel!=null){Controls.Remove(failureLabel);failureLabel.Dispose();failureLabel=null;}}else ShowFailure("HTMLを表示できません。ブラウザー状態："+e.WebErrorStatus);}};
                 c.ProcessFailed+=(_,e)=>{if(!closed){Rendered=false;ready=false;ShowFailure("WebView2のブラウザープロセスが異常終了しました。画面を閉じて開き直してください。状態："+e.ProcessFailedKind);}};ready=true;if(hostZoom)SetDisplaySize(pendingSize);
             }
-            navigationId=0;document?.Dispose();document=new MemoryStream(Limits.Utf8.GetBytes(clean),false);documentUrl=documentBase+(++revision).ToString();Rendered=false;web.CoreWebView2.Navigate(documentUrl);
+            navigationId=0;ReleaseDocument();document=new MemoryStream(Limits.Utf8.GetBytes(clean),0,Limits.Utf8.GetByteCount(clean),false,true);documentUrl=documentBase+(++revision).ToString();Rendered=false;web.CoreWebView2.Navigate(documentUrl);
         }catch(Exception e){if(!closed){var failure=e as BrowserFailure??new BrowserFailure(stage,e);ShowFailure(failure.UserMessage);throw failure;}}finally{update.Release();}
     }
     void ShowRuntimeHelp()
@@ -57,6 +57,20 @@ public sealed class HtmlView : UserControl
     }
     void ShowFailure(string message){if(closed)return;if(failureLabel==null){failureLabel=new Label{AutoSize=false,Dock=DockStyle.Fill,Padding=new Padding(18),BackColor=Color.White,ForeColor=Color.DarkRed};Controls.Add(failureLabel);}failureLabel.Text=message;failureLabel.BringToFront();}
     public Task<bool> CloseAsync()=>CleanupTask??=CloseCore();
-    async Task<bool> CloseCore(){closed=true;try{await update.WaitAsync().WaitAsync(TimeSpan.FromSeconds(12));}catch{profile.InitializationTimedOut();return false;}try{web.Dispose();document?.Dispose();}finally{update.Release();}return await profile.Cleanup();}
-    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;web.Dispose();document?.Dispose();CleanupTask=profile.Cleanup();}base.Dispose(disposing);}
+    void ReleaseDocument()
+    {
+        if(document==null)return;
+        if(document.TryGetBuffer(out var bytes)&&bytes.Array!=null)Sodium.Wipe(bytes.Array);
+        document.Dispose();document=null;
+    }
+    async Task<bool> CloseCore()
+    {
+        closed=true;
+        // SemaphoreSlim.WaitAsync cancellation removes its waiter on timeout.
+        using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        try{await update.WaitAsync(timeout.Token);}catch{web.Dispose();ReleaseDocument();profile.InitializationTimedOut();return false;}
+        try{web.Dispose();ReleaseDocument();}finally{update.Release();}
+        return await profile.Cleanup();
+    }
+    protected override void Dispose(bool disposing){if(disposing&&!closed){closed=true;web.Dispose();ReleaseDocument();CleanupTask=profile.Cleanup();}base.Dispose(disposing);}
 }

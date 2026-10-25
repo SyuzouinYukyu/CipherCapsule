@@ -14,11 +14,10 @@ public sealed class ArmorMessageForm:AppForm
     readonly Label status=Label("本文はUTF-8で1～16KiB。添付・HTMLは非対応です。");
     readonly Button encrypt,decrypt,copy,paste,cancel,close;
     CancellationTokenSource? cts;bool busy,closePending;
-    readonly string temporaryRoot=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CipherCapsule","ArmorMessages");
 
     public ArmorMessageForm(float size)
     {
-        Text="CipherCapsule v1.1.9 — 暗号メッセージ";ClientSize=new Size(1080,880);MinimumSize=new Size(800,760);
+        Text="CipherCapsule v1.1.10 — 暗号メッセージ";ClientSize=new Size(1080,880);MinimumSize=new Size(800,760);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=12,Padding=new Padding(12)};
         layout.ColumnStyles.Add(new(SizeType.Percent,100));
         for(int i=0;i<12;i++)layout.RowStyles.Add(new(i==3?SizeType.Percent:i==5?SizeType.Percent:i==7?SizeType.Percent:SizeType.AutoSize,i==3?25:i==5?45:i==7?30:0));
@@ -78,11 +77,11 @@ public sealed class ArmorMessageForm:AppForm
         if(busy)return;byte[]? secret=null;state.BeginOperation();decoded.Clear();UpdateButtons();
         try
         {
-            if(creation)AsciiArmor.ValidateText(plain.Text);else _=AsciiArmor.Decode(cipher.Text);
+            if(creation)AsciiArmor.ValidateText(plain.Text);else ArmorMessageState.ValidatePaste(cipher.Text);
             secret=password.Take(creation);string input=creation?plain.Text:cipher.Text;
             busy=true;cts=new();UpdateButtons();status.Text="認証付き暗号処理中です（Argon2id・256MiB）…";
             byte[] key=secret;var ct=cts.Token;
-            string value=await Task.Run(()=>creation?ArmorMessages.Encrypt(input,key,temporaryRoot,ct):ArmorMessages.Decrypt(input,key,temporaryRoot,ct));
+            string value=await Task.Run(()=>creation?ArmorMessages.Encrypt(input,key,ct):ArmorMessages.Decrypt(input,key,ct));
             if(closePending)return;
             if(creation){cipher.Text=value;state.EncryptionSucceeded(value);status.Text="暗号化しました。「コピー」で送信できます。";}
             else{state.DecryptionSucceeded(value);decoded.Text=state.PlainResult;status.Text="認証に成功しました。";}

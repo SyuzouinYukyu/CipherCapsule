@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><UseWindowsForms>false</UseWindowsForms><PublishSingleFile>false</PublishSingleFile></PropertyGroup>
+ <ItemGroup><Compile Remove="Legacy119/**/*.cs;Android104/**/*.cs;GuiProbe/**/*.cs;IsolatedLauncher/**/*.cs" />
+ <Compile Include="../../src/Builder/CcapIconRegistration.cs;../../src/Builder/PrivacyMigration.cs;../../src/Builder/EditorSwitchQueue.cs;../../src/Builder/Settings.cs;../../src/Builder/OutputFormat.cs;../../src/Shared/ManagedFiles.cs;../../src/Shared/ProfileDirectory.cs" Link="Product/%(Filename)%(Extension)" />
+ <ProjectReference Include="../../src/Core/Core.csproj" />
+ <ProjectReference Include="Legacy119/Legacy119.csproj" Aliases="Legacy119" />
+ <ProjectReference Include="Android104/Android104.csproj" Aliases="Android104" />
+ </ItemGroup>
+</Project>

@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><PublishSingleFile>false</PublishSingleFile><UseWindowsForms>true</UseWindowsForms></PropertyGroup><ItemGroup><ProjectReference Include="../../../src/Builder/Builder.csproj" Aliases="BuilderApp" /><ProjectReference Include="../../../src/Core/Core.csproj" /></ItemGroup></Project>

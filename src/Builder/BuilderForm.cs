@@ -25,7 +25,7 @@ public sealed class BuilderForm : AppForm
     string lastOutputDirectory=Settings.Documents;
     public BuilderForm()
     {
-        Text="CipherCapsule v1.1.9";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
+        Text="CipherCapsule v1.1.10";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
         var settings=Settings.Load();SetSize(settings.Font);Size=new Size(Math.Max(900,settings.Width),Math.Max(960,settings.Height));
         lastOutputDirectory=settings.LastOutputDirectory;
         password.SetRevealed(settings.PasswordRevealed);
@@ -53,7 +53,7 @@ public sealed class BuilderForm : AppForm
         htmlEditor.FileDropRequested=values=>HandleFileDrop(values,FileDropArea.Other);
         FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;bool cleaned=await htmlEditor.CloseAsync();if(!cleaned)MessageBox.Show(this,"WebView2の一時領域を削除できませんでした。完全消去は保証できません。\n"+htmlEditor.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);
             SaveSettings();
-            password.ClearSecrets();editor.Clear();closing=true;Close();};
+            password.ClearSecrets();editor.Clear();result.Clear();closing=true;Close();};
         SwitchMode();UpdateRun();SizeChecksumRow();
     }
     void SwitchMode(){bool html=mode.SelectedIndex==1;editor.Visible=!html;htmlEditor.Visible=html;if(html)htmlEditor.BringToFront();else editor.BringToFront();}

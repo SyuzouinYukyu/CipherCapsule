@@ -14,12 +14,3 @@ public static class FileDropRouting
         return FileDropAction.Ignore;
     }
 }
-public static class AutomaticCcapIcon
-{
-    public static string? Apply(Action install)
-    {
-        try{install();return null;}
-        catch(UnauthorizedAccessException){return "CCAPアイコンを設定できませんでした。現在のユーザーの設定先へのアクセスが拒否されました。暗号化・復号は引き続き利用できます。";}
-        catch(Exception){return "CCAPアイコンを設定できませんでした。設定先・復元情報・書込み権限を確認してください。暗号化・復号は引き続き利用できます。";}
-    }
-}

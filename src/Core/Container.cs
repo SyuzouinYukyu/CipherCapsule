@@ -14,7 +14,7 @@ public static class Container
     static void P32(byte[] b, int i, uint v) => BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(i), v);
     public static byte[] Read(Stream s, int n) { byte[] b = new byte[n]; s.ReadExactly(b); return b; }
     static FileStream Open(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.Read, Limits.Chunk, FileOptions.SequentialScan);
-    public static (long Offset, long Length) Locate(FileStream s)
+    public static (long Offset, long Length) Locate(Stream s)
     {
         if (s.Length < 256) throw new InvalidDataException("有効な暗号化EXEではありません。");
         s.Position=0;if(Read(s,8).AsSpan().SequenceEqual(Magic))return LocateCcap(s);
@@ -53,7 +53,7 @@ public static class Container
         }
         throw new InvalidDataException("暗号化コンテナーを検出できません。");
     }
-    public static (long Offset,long Length) LocateCcap(FileStream s)
+    public static (long Offset,long Length) LocateCcap(Stream s)
     {
         if(s.Length<HeaderSize+16+FooterSize)throw new InvalidDataException("有効なCCAPファイルではありません。");
         s.Position=0;if(!Read(s,8).AsSpan().SequenceEqual(Magic))throw new InvalidDataException("CCAP形式ではありません。自己復号EXEは直接起動してください。");
@@ -65,11 +65,39 @@ public static class Container
         =>Generate(Stream.Null,output,body,kind,paths,password,overwrite,ct,progress,allowCopy);
     public static void Generate(Stream template, string output, string body, BodyKind kind, IReadOnlyList<string> paths, byte[] password, bool overwrite, CancellationToken ct, IProgress<CapsuleProgress>? progress = null, bool allowCopy = true)
     {
-        Limits.Password(Limits.Utf8.GetString(password)); Limits.BodyText(body); Limits.Inputs(paths);
-        if (!Enum.IsDefined(kind)) throw new ArgumentException();
+        ValidateInputs(body,kind,paths,password);
         string dest = Path.GetFullPath(output);
         if (paths.Any(p => string.Equals(Path.GetFullPath(p), dest, StringComparison.OrdinalIgnoreCase))) throw new IOException("添付元と同じパスには出力できません。");
         string temp = AtomicFile.Temporary(dest);
+        try
+        {
+            using(var target=new FileStream(temp,FileMode.CreateNew,FileAccess.ReadWrite,FileShare.None,Limits.Chunk,FileOptions.SequentialScan))
+            { WriteContainer(template,target,body,kind,paths,password,ct,progress,allowCopy); target.Flush(true); }
+            progress?.Report(new("生成データを再検証しています",0,1));
+            using(var verify=Unlock(temp,password,ct)) { }
+            ct.ThrowIfCancellationRequested(); AtomicFile.Commit(temp,dest,overwrite);
+            progress?.Report(new("完了",1,1));
+        }
+        finally { AtomicFile.Delete(temp); }
+    }
+    // The caller owns the stream. The same writer and full authentication checks
+    // are used by file and memory paths, preserving the CCAP wire format.
+    public static void GenerateCcap(Stream target,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true)
+    {
+        ValidateInputs(body,kind,paths,password);
+        if(!target.CanRead||!target.CanWrite||!target.CanSeek||target.Position!=0||target.Length!=0)throw new ArgumentException("空の読み書き可能なシーク対応ストリームが必要です。");
+        WriteContainer(Stream.Null,target,body,kind,paths,password,ct,progress,allowCopy);
+        target.Position=0;
+        using(var verify=Unlock(target,password,ct,ccapOnly:true,leaveOpen:true)) { }
+        ct.ThrowIfCancellationRequested(); target.Position=0;
+    }
+    static void ValidateInputs(string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password)
+    {
+        Limits.Password(Limits.Utf8.GetString(password)); Limits.BodyText(body); Limits.Inputs(paths);
+        if (!Enum.IsDefined(kind)) throw new ArgumentException();
+    }
+    static void WriteContainer(Stream template,Stream target,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,CancellationToken ct,IProgress<CapsuleProgress>? progress,bool allowCopy)
+    {
         byte[] dek = Sodium.Random(32), salt = Sodium.Random(16), wn = Sodium.Random(24), mn = Sodium.Random(24);
         byte[]? kek = null, mk = null, plain = null;
         try
@@ -79,7 +107,6 @@ public static class Container
             byte[] header = new byte[HeaderSize]; Magic.CopyTo(header,0); P32(header,8,1); P32(header,12,1); P64(header,16,3); P64(header,24,256L*1024*1024);
             salt.CopyTo(header,32); wn.CopyTo(header,48); mn.CopyTo(header,72);
             Sodium.Encrypt(dek,header[..96],wn,kek).CopyTo(header,96); Sodium.Wipe(kek); kek=null;
-            using (var target = new FileStream(temp,FileMode.CreateNew,FileAccess.ReadWrite,FileShare.None,Limits.Chunk,FileOptions.SequentialScan))
             {
                 template.CopyTo(target); long start = target.Position; target.Write(header);
                 var manifest = new Manifest { Body=body, Kind=kind, AllowCopy=allowCopy };
@@ -114,21 +141,23 @@ public static class Container
                 byte[] cipher=Sodium.Encrypt(plain,header,mn,mk); target.Write(cipher);
                 long len=target.Position-start;
                 byte[] footer=new byte[FooterSize]; EndMagic.CopyTo(footer,0); P32(footer,8,1); P64(footer,16,start); P64(footer,24,len); SHA256.HashData(footer.AsSpan(0,32)).CopyTo(footer,32); target.Write(footer);
-                target.Position=start; target.Write(header); target.Flush(true);
+                target.Position=start; target.Write(header); target.Flush();
             }
-            progress?.Report(new("生成データを再検証しています",0,1));
-            using (var verify=Unlock(temp,password,ct)) { }
-            ct.ThrowIfCancellationRequested(); AtomicFile.Commit(temp,dest,overwrite);
-            progress?.Report(new("完了",1,1));
         }
-        finally { AtomicFile.Delete(temp); Sodium.Wipe(dek); Sodium.Wipe(kek); Sodium.Wipe(mk); Sodium.Wipe(plain); }
+        finally { Sodium.Wipe(dek); Sodium.Wipe(kek); Sodium.Wipe(mk); Sodium.Wipe(plain); }
     }
     public static UnlockedCapsule Unlock(string path, byte[] password, CancellationToken ct, IProgress<CapsuleProgress>? progress=null,bool ccapOnly=false)
     {
-        FileStream? s=null; byte[]? kek=null,dek=null,mk=null,plain=null;
+        Stream source;
+        try{source=Open(path);}catch{throw new CryptographicException(AuthFailure);}
+        return Unlock(source,password,ct,progress,ccapOnly,leaveOpen:false);
+    }
+    public static UnlockedCapsule Unlock(Stream source,byte[] password,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool ccapOnly=true,bool leaveOpen=false)
+    {
+        Stream? s=source; byte[]? kek=null,dek=null,mk=null,plain=null;
         try
         {
-            Limits.Password(Limits.Utf8.GetString(password),false); s=Open(path); var loc=ccapOnly?LocateCcap(s):Locate(s); s.Position=loc.Offset;
+            Limits.Password(Limits.Utf8.GetString(password),false); if(!s.CanRead||!s.CanSeek)throw new InvalidDataException(); var loc=ccapOnly?LocateCcap(s):Locate(s); s.Position=loc.Offset;
             byte[] h=Read(s,HeaderSize);
             if (!h.AsSpan(0,8).SequenceEqual(Magic) || U32(h,8)!=1 || U32(h,12)!=1 || I64(h,16)!=3 || I64(h,24)!=256L*1024*1024 || U32(h,160)>Limits.Count || U32(h,164)!=Limits.Chunk || I64(h,168)!=0) throw new InvalidDataException();
             long mo=I64(h,144),ml=I64(h,152);
@@ -156,11 +185,11 @@ public static class Container
                 expected=checked(expected+cl); total=checked(total+a.Size); if(total>Limits.Total) throw new InvalidDataException();
             }
             if(expected!=mo) throw new InvalidDataException();
-            var result=new UnlockedCapsule(s,loc.Offset,m,dek); s=null; dek=null; return result;
+            var result=new UnlockedCapsule(s,loc.Offset,m,dek,!leaveOpen); s=null; dek=null; return result;
         }
         catch(OperationCanceledException) { throw; }
         catch { throw new CryptographicException(AuthFailure); }
-        finally { s?.Dispose(); Sodium.Wipe(kek); Sodium.Wipe(dek); Sodium.Wipe(mk); Sodium.Wipe(plain); }
+        finally { if(!leaveOpen)s?.Dispose(); Sodium.Wipe(kek); Sodium.Wipe(dek); Sodium.Wipe(mk); Sodium.Wipe(plain); }
     }
     static void HashRange(Stream s,long length,IncrementalHash hash,CancellationToken ct,IProgress<CapsuleProgress>? p,string stage)
     {
@@ -169,9 +198,9 @@ public static class Container
     }
     public sealed class UnlockedCapsule : IDisposable
     {
-        readonly FileStream source; readonly long start; readonly byte[] dek; readonly SemaphoreSlim gate=new(1,1); bool disposed;
+        readonly Stream source; readonly bool ownsSource; readonly long start; readonly byte[] dek; readonly SemaphoreSlim gate=new(1,1); bool disposed;
         public Manifest Manifest { get; }
-        internal UnlockedCapsule(FileStream source,long start,Manifest m,byte[] dek) { this.source=source; this.start=start; Manifest=m; this.dek=dek; }
+        internal UnlockedCapsule(Stream source,long start,Manifest m,byte[] dek,bool ownsSource) { this.source=source; this.ownsSource=ownsSource; this.start=start; Manifest=m; this.dek=dek; }
         public void Save(int index,string output,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null)
         {
             gate.Wait(ct); string? temp=null; byte[]? key=null,state=null,plain=null,enc=null;
@@ -180,7 +209,7 @@ public static class Container
                 ObjectDisposedException.ThrowIf(disposed,this);
                 if(index<0 || index>=Manifest.Attachments.Count) throw new ArgumentOutOfRangeException(nameof(index));
                 string dest=Path.GetFullPath(output); Limits.FileName(Path.GetFileName(dest));
-                if(string.Equals(dest,source.Name,StringComparison.OrdinalIgnoreCase)) throw new IOException("実行中の暗号化EXEには保存できません。");
+                if(source is FileStream file&&string.Equals(dest,file.Name,StringComparison.OrdinalIgnoreCase)) throw new IOException("実行中の暗号化EXEには保存できません。");
                 temp=AtomicFile.Temporary(dest); var a=Manifest.Attachments[index];
                 key=Sodium.Derive(dek,(ulong)index+1,"CCATTCH1"); state=Sodium.NewState(); plain=new byte[Limits.Chunk]; enc=new byte[Limits.Chunk+17];
                 source.Position=start+a.Offset; Sodium.InitPull(state,Read(source,24),key); long left=a.Size;
@@ -200,6 +229,6 @@ public static class Container
             }
             finally { AtomicFile.Delete(temp); Sodium.Wipe(key); Sodium.Wipe(state); Sodium.Wipe(plain); Sodium.Wipe(enc); gate.Release(); }
         }
-        public void Dispose() { gate.Wait(); try { if(disposed)return; disposed=true; Sodium.Wipe(dek); Manifest.Body=""; source.Dispose(); } finally { gate.Release(); } }
+        public void Dispose() { gate.Wait(); try { if(disposed)return; disposed=true; Sodium.Wipe(dek); Manifest.Body=""; if(ownsSource)source.Dispose(); } finally { gate.Release(); } }
     }
 }

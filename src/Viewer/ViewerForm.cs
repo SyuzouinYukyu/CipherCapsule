@@ -34,7 +34,7 @@ public sealed class ViewerForm : AppForm
         var footer=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=2};footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));footer.Controls.Add(bar,0,0);
         var spec=new LinkLabel{Text="暗号アルゴリズム仕様",AutoSize=true,Anchor=AnchorStyles.Right,Margin=new Padding(10,4,4,4)};tips.SetToolTip(spec,"実装されている暗号方式・整合性確認・制限を表示します。");spec.LinkClicked+=(_,_)=>ShowSpecification();footer.Controls.Add(spec,1,0);root.Controls.Add(footer,0,3);Controls.Add(root);
         files.SelectedIndexChanged+=(_,_)=>save.Enabled=!busy&&files.SelectedIndices.Count==1;
-        FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;text.Clear();if(html!=null&&!await html.CloseAsync())MessageBox.Show(this,"WebView2の終了後、一時領域の削除を完了できませんでした。完全消去は保証できません。\n"+html.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);closing=true;BeginInvoke(new Action(Close));};
+        FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;text.Clear();if(html!=null&&!await html.CloseAsync())MessageBox.Show(this,"WebView2の終了後、一時領域の削除を完了できませんでした。完全消去は保証できません。\n"+html.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);capsule.Dispose();closing=true;BeginInvoke(new Action(Close));};
     }
     protected override void OnFontSizeChanged(){html?.SetDisplaySize(UiSize);}
     async Task Save()
