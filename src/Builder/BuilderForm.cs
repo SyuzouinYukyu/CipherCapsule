@@ -6,7 +6,7 @@ namespace CipherCapsule.Builder;
 public sealed class BuilderForm : AppForm
 {
     readonly CheckBox selfExtracting=new(){Text="自己展開アーカイブの作成",Checked=true,AutoSize=true,Margin=new Padding(6),AccessibleName="自己展開アーカイブの作成"};
-    readonly Button openCcap;
+    readonly Button openCcap,armorMessage;
     bool opening;readonly HashSet<Control> dropControls=[];
     readonly ComboBox mode=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=130,AccessibleName="本文形式"};
     readonly TextBox editor=new(){Multiline=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,AcceptsReturn=true,AcceptsTab=true,MaxLength=Limits.Body,AccessibleName="メッセージ本文",AllowDrop=true};
@@ -25,7 +25,7 @@ public sealed class BuilderForm : AppForm
     string lastOutputDirectory=Settings.Documents;
     public BuilderForm()
     {
-        Text="CipherCapsule v1.1.8";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
+        Text="CipherCapsule v1.1.9";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
         var settings=Settings.Load();SetSize(settings.Font);Size=new Size(Math.Max(900,settings.Width),Math.Max(960,settings.Height));
         lastOutputDirectory=settings.LastOutputDirectory;
         password.SetRevealed(settings.PasswordRevealed);
@@ -42,7 +42,8 @@ public sealed class BuilderForm : AppForm
         generate.Padding=cancel.Padding=new Padding(12,8,12,8);generate.Margin=new Padding(0,4,10,4);cancel.Margin=new Padding(0,4,0,4);SizeActionButtons();
         var actions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,AutoSize=true,Margin=new Padding(0)};actions.ColumnStyles.Add(new(SizeType.Percent,100));actions.ColumnStyles.Add(new(SizeType.AutoSize));actions.ColumnStyles.Add(new(SizeType.AutoSize));generate.Anchor=cancel.Anchor=AnchorStyles.Right;actions.Controls.Add(generate,1,0);actions.Controls.Add(cancel,2,0);
         openCcap=Button("暗号化ファイルを開く…",async(_,_)=>await OpenCcapDialog());
-        config.Controls.Add(Flow(selfExtracting));config.Controls.Add(Flow(openCcap));
+        armorMessage=Button("暗号メッセージ",(_,_)=>{if(busy||opening)return;using var dialog=new ArmorMessageForm(UiSize);dialog.ShowDialog(this);});
+        config.Controls.Add(Flow(selfExtracting));config.Controls.Add(Flow(openCcap,armorMessage));
         config.Controls.Add(password);config.Controls.Add(Label("空欄不可・最大256文字。空白も保持します。安全のため長いパスフレーズを推奨します。"));var sums=new FlowLayoutPanel{AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=false,Margin=new Padding(0)};sums.Controls.AddRange([checksum,checksum256]);config.Controls.Add(Flow(allowCopy,sums));config.Controls.Add(actions);
         root.RowStyles.Add(new(SizeType.Percent,100));root.RowStyles.Add(new(SizeType.AutoSize));root.RowStyles.Add(new(SizeType.Absolute,94));root.RowStyles.Add(new(SizeType.AutoSize));root.Controls.Add(editArea,0,0);root.Controls.Add(config,0,1);root.Controls.Add(result,0,2);
         var progress=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=1};progress.Controls.Add(status);progress.Controls.Add(bar);root.Controls.Add(progress,0,3);Controls.Add(root);
@@ -57,7 +58,7 @@ public sealed class BuilderForm : AppForm
     }
     void SwitchMode(){bool html=mode.SelectedIndex==1;editor.Visible=!html;htmlEditor.Visible=html;if(html)htmlEditor.BringToFront();else editor.BringToFront();}
     void UpdateRun()=>generate.Enabled=!busy&&!opening&&password.CanRun;
-    void SetBusy(bool value){busy=value;selfExtracting.Enabled=!value;openCcap.Enabled=!value;editArea.Enabled=!value;password.Enabled=!value;allowCopy.Enabled=!value;checksum.Enabled=!value;checksum256.Enabled=!value;generate.Enabled=!value&&password.CanRun;cancel.Enabled=value;}
+    void SetBusy(bool value){busy=value;selfExtracting.Enabled=!value;openCcap.Enabled=!value;armorMessage.Enabled=!value;editArea.Enabled=!value;password.Enabled=!value;allowCopy.Enabled=!value;checksum.Enabled=!value;checksum256.Enabled=!value;generate.Enabled=!value&&password.CanRun;cancel.Enabled=value;}
     bool DropBlocked=>busy||opening||closing||closePending||IsDisposed||Disposing||!Enabled;
     FileDropArea DropArea(Control control)=>ReferenceEquals(control,editor)?FileDropArea.TextBody:ReferenceEquals(control,files)?FileDropArea.Attachments:FileDropArea.Other;
     static string[] DroppedFiles(IDataObject? data){try{return data?.GetData(DataFormats.FileDrop,false) as string[]??[];}catch{return [];}}

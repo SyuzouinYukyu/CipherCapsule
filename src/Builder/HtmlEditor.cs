@@ -161,7 +161,7 @@ public sealed class HtmlEditor : UserControl
         if(closed||IsDisposed)return;
         try{
             string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CipherCapsule","Diagnostics");Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder,"editor-switch118.json"),JsonSerializer.Serialize(new{version="1.1.8",utc=DateTime.UtcNow,ready,selected=tabs.SelectedIndex,errorType=error.GetType().Name,hresult=error.HResult,events=switchTrace.ToArray()}));
+            File.WriteAllText(Path.Combine(folder,"editor-switch118.json"),JsonSerializer.Serialize(new{version="1.1.9",utc=DateTime.UtcNow,ready,selected=tabs.SelectedIndex,errorType=error.GetType().Name,hresult=error.HResult,events=switchTrace.ToArray()}));
         }catch{}
         MessageBox.Show(this,"HTML表示を切り替えられませんでした。編集中の内容は保持しています。初期化・応答を待って、もう一度タブを選択してください。","HTML切替",MessageBoxButtons.OK,MessageBoxIcon.Warning);
     }

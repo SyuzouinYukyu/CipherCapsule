@@ -107,7 +107,17 @@ Windowsの保護機能を無効化して使用することは推奨しません�
 
 ### パスワードで守る、自己復号型の暗号化メッセージ
 
-**CipherCapsule v1.1.8**
+**CipherCapsule v1.1.9**
+
+## v1.1.9の改良
+
+独立した「暗号メッセージ」画面を追加しました。UTF-8で最大16KiBのTEXT本文をCipherCapsule ASCII Armor暗号文に変換し、利用者の明示的な「コピー」「貼り付け」でWindows／Android間へ送受信できます。日本語・絵文字・改行を保持します。既存CCAP全体をBase64化する独自形式で、OpenPGP／PGPとは互換性がありません。[共通形式と制限](ASCII_ARMOR.md)を参照してください。
+
+Argon2id、XChaCha20-Poly1305、CCAPコンテナー構造、通常の自己復号EXE・CCAP、TEXT／HTML・添付機能は維持しました。誤パスワードや不正形式を拒否し、認証失敗時には以前の復号本文を消去します。LF改行が一行表示になる不具合も修正しました。暗号文だけを明示操作でコピーし、平文やパスワードの自動コピーは行いません。OSのクリップボード履歴・同期に暗号文が残る可能性があります。
+
+新規97件と代表的回帰6件のホスト試験は成功、失敗0件。正式EXEの実GUIではコピー・貼り付け、Unicode本文の復号、誤パスワードの拒否、9／12／17pt、幅変更、通常終了を確認しました。物理DPI切替とGUI上のキャンセル操作タイミングは未検証です。Android端末との物理クリップボード送受信は本版の検証に含めません。
+
+正式EXE：`CipherCapsule_v1.1.9.exe`、174,442,410 bytes、SHA-256 `B35E6381E85ABF0FD6F5E126B48616DA3B1C1077863D297D314BFAC446C5260C`。[v1.1.9 Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.9) · [対応ソース](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.9) · [Android版](https://github.com/SyuzouinYukyu/CipherCapsule-for-Android/releases/tag/v1.0.4)。コード署名はなく、Windows SmartScreen等が警告する場合があります。配布元とSHA-256を確認してください。
 
 ## v1.1.8の修正
 
@@ -143,7 +153,7 @@ CCAPのダブルクリック起動を希望する場合は、Windowsの「プロ
 
 v1.1.4の同内容測定例：本文のみ EXE 52,739,663 bytes／CCAP 382 bytes、複数添付 EXE 52,740,275 bytes／CCAP 994 bytes。旧版の測定値で、すべてのメッセージの圧縮率を保証しません。
 
-対応ソース：[v1.1.8](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.8)。配布：[Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.8)。[ビルド手順](BUILDING.md)、[第三者ライセンス](THIRD_PARTY_NOTICES.md)。
+対応ソース：[v1.1.9](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.9)。配布：[Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.9)。[ビルド手順](BUILDING.md)、[第三者ライセンス](THIRD_PARTY_NOTICES.md)。
 
 CipherCapsuleは、TEXT・HTML形式のメッセージと複数の添付ファイルを暗号化し、**自己復号EXEまたは小容量のCCAPファイル**として出力するWindows用ソフトウェアです。
 
@@ -487,7 +497,7 @@ HTML編集・HTML表示にはMicrosoft Edge WebView2 Runtimeが必要です。
 
 ## ✉️ 暗号化メッセージを作成する
 
-1. `CipherCapsule_v1.1.8.exe`を起動します。
+1. `CipherCapsule_v1.1.9.exe`を起動します。
 2. メッセージ形式としてTEXTまたはHTMLを選択します。
 3. 本文を入力します。
 4. 必要に応じて添付ファイルを登録します。
@@ -594,7 +604,7 @@ v1.1.1では、.NETのSingleFile圧縮機能を利用することで、Viewerを
 | Shared | WebView2表示、GUI共通処理 |
 | Tests | 暗号処理・HTML・GUI関連試験 |
 
-v1.1.8で使用する主な依存関係：
+v1.1.9で使用する主な依存関係：
 
 - .NET SDK 10.0.402
 - libsodium 1.0.22

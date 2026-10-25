@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><UseWindowsForms>false</UseWindowsForms><PublishSingleFile>false</PublishSingleFile></PropertyGroup>
+ <ItemGroup><ProjectReference Include="../../src/Core/Core.csproj"/><ProjectReference Include="../../../../../CipherCapsule for Android/v1.0.3/Source/CipherCapsule.Core/CipherCapsule.Core.csproj" Aliases="Android103"/></ItemGroup>
+</Project>

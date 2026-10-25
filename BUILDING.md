@@ -1,4 +1,4 @@
-# CipherCapsule v1.1.8をソースからビルド
+# CipherCapsule v1.1.9をソースからビルド
 
 Windows 11 x64、.NET SDK 10.0.402、Python 3、Node.jsを使用します。固定依存アーカイブ・対応ソース・ライセンスとNuGetロックファイルはリポジトリに同梱しています。
 
@@ -8,13 +8,13 @@ Windows 11 x64、.NET SDK 10.0.402、Python 3、Node.jsを使用します。固�
 python scripts/build_repository.py --stage
 ```
 
-固定libsodiumハッシュ・公式署名とTinyMCE配布物の完全性を検証し、`Work/rebuild/<日時>/Source`へ隔離コピーします。`build118.py`はViewer、Builderの順でRelease / win-x64 / SelfContained / PublishSingleFile / 圧縮有効 / PublishTrimmed=falseとして発行します。出力は同じ隔離領域の`Work/stage`です。配布済み正式EXEは置き換えません。.NET Runtimeの別途インストールは不要ですが、HTML編集・表示にはMicrosoft Edge WebView2 Runtimeが必要です。
+固定libsodiumハッシュ・公式署名とTinyMCE配布物の完全性を検証し、`Work/rebuild/<日時>/Source`へ隔離コピーします。`build119.py`はViewer、Builderの順でRelease / win-x64 / SelfContained / PublishSingleFile / 圧縮有効 / PublishTrimmed=falseとして発行します。出力は同じ隔離領域の`Work/stage`です。配布済み正式EXEは置き換えません。.NET Runtimeの別途インストールは不要ですが、HTML編集・表示にはMicrosoft Edge WebView2 Runtimeが必要です。
 
 入力だけを検証する場合：`python scripts/build_repository.py --check-inputs`
 
 TinyMCE資産を再構成する場合は、隔離コピーのSource内から`python scripts/editor_assets.py`を実行します。`editor-ui-scale.js`と`editor-bridge.js`もeditor.zipへ収録し、ベンダー資産を直接変更しません。
 
-## 既存の検証結果
+## v1.1.8までの既存検証結果
 
 自動検証はUI寸法23件、JS橋渡し統合10件、切替状態・INI22件、チェックサム22件、旧新互換4件、合計81件成功／0件失敗。2026年10月24日に利用者からWindows実機GUI手動確認の全項目合格を受領しています。実デスクトップの自動操作は行っていません。物理モニターのDPI切替は未検証です。
 
@@ -32,3 +32,7 @@ TinyMCE資産を再構成する場合は、隔離コピーのSource内から`pyt
 従来の試験・補助スクリプトは参考資料です。古いバージョンの発行処理を現行版へ実行しないでください。固定パスワード・本文は公開用ダミーで、個人INI・内部記録・生成試験EXEは含みません。
 
 LICENSE、THIRD_PARTY_NOTICES.md、licenses、vendorの著作権表示・対応ソースを保持してください。暗号Core・コンテナー形式・依存版はv1.1.7から変更していません。
+
+## v1.1.9の限定検証
+
+新機能のホスト試験は `python scripts/test119.py` で97件と代表的回帰6件です。この試験の一部は同じ共通形式を実装したAndroid v1.0.3のソースを、開発時と同じ兄弟ディレクトリに要求します。公開のために試験や正式EXEの再ビルドは行っていません。
