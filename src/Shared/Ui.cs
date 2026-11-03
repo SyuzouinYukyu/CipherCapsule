@@ -91,14 +91,22 @@ public sealed class PasswordDialog : AppForm
 {
     public readonly PasswordPanel Password=new();
     readonly Button unlock,cancel; readonly Label status=Label("パスワードを入力してください。");
-    CancellationTokenSource? cts; bool working;
+    CancellationTokenSource? cts; bool working; readonly string publicText;
     public Container.UnlockedCapsule? Capsule { get; private set; }
     public PasswordDialog(string path,bool ccapOnly=false)
     {
+        publicText=CipherCapsule.Core.Container.ReadPublicMessage(path,ccapOnly);
         Text="CipherCapsule — パスワード認証"; ClientSize=new Size(720,300); MinimumSize=new Size(640,330);
         var layout=new TableLayoutPanel { Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(14),RowCount=4,ColumnCount=1 };
         unlock=Button("復号して開く",async(_,_)=>await Open(path,ccapOnly)); unlock.Enabled=false;
         cancel=Button("閉じる／キャンセル",(_,_)=>{ if(working)cts?.Cancel(); else Close(); });
+        if(publicText.Length>0){
+            ClientSize=new Size(800,590);MinimumSize=new Size(720,590);layout.AutoSize=false;
+            var area=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3};area.RowStyles.Add(new(SizeType.AutoSize));area.RowStyles.Add(new(SizeType.Percent,100));area.RowStyles.Add(new(SizeType.AutoSize));
+            area.Controls.Add(Label("送信者からのメッセージ"),0,0);area.Controls.Add(new TextBox{Text=publicText,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,WordWrap=true,AccessibleName="送信者からのメッセージ"},0,1);
+            area.Controls.Add(new Label{AutoSize=true,Dock=DockStyle.Fill,Text="このメッセージは非暗号化・未認証です。送信者による真正性は保証されません。"},0,2);
+            layout.Controls.Add(area);layout.RowStyles.Add(new(SizeType.Percent,100));for(int i=0;i<4;i++)layout.RowStyles.Add(new(SizeType.AutoSize));layout.RowCount=5;
+        }
         layout.Controls.Add(Label("マスク時は確認入力も必要です。表示切替で1行にできます。")); layout.Controls.Add(Password); layout.Controls.Add(status); layout.Controls.Add(Flow(unlock,cancel)); Controls.Add(layout);
         Password.ValidityChanged+=(_,_)=>unlock.Enabled=!working&&Password.CanRun; AcceptButton=unlock; CancelButton=cancel;
         FormClosing+=(_,e)=>{ if(working) { e.Cancel=true; cts?.Cancel(); } else Password.ClearSecrets(); };
@@ -110,6 +118,7 @@ public sealed class PasswordDialog : AppForm
             p=Password.Take(false); working=true; unlock.Enabled=false; Password.Enabled=false; cts=new();
             status.Text="パスワードと全添付の暗号文を検証しています…";
             byte[] key=p; Capsule=await Task.Run(()=>CipherCapsule.Core.Container.Unlock(path,key,cts.Token,ccapOnly:ccapOnly));
+            if(Capsule.PublicMessageText!=publicText){Capsule.Dispose();Capsule=null;throw new System.Security.Cryptography.CryptographicException(CipherCapsule.Core.Container.AuthFailure);}
             Password.ClearSecrets(); DialogResult=DialogResult.OK;
         }
         catch(Exception ex) { Error(this,ex); status.Text="再入力してください。"; }

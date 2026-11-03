@@ -12,6 +12,8 @@ public sealed class AttachmentInfo
 }
 public sealed class Manifest
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PublicMessageSha256 { get; set; }
     public BodyKind Kind { get; set; }
     public string Body { get; set; } = "";
     public bool AllowCopy { get; set; } = true;

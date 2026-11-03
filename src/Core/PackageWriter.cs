@@ -6,9 +6,9 @@ public sealed record PackageResult(string Path,long Size,string Sha256,string? S
 }
 public static class PackageWriter
 {
-    public static PackageResult GenerateCcap(string output,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,bool checksum,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true,bool checksum256=false)
-        =>Generate(Stream.Null,output,body,kind,paths,password,checksum,overwrite,ct,progress,allowCopy,checksum256);
-    public static PackageResult Generate(Stream template,string output,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,bool checksum,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true,bool checksum256=false)
+    public static PackageResult GenerateCcap(string output,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,bool checksum,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true,bool checksum256=false,string? publicMessage=null)
+        =>Generate(Stream.Null,output,body,kind,paths,password,checksum,overwrite,ct,progress,allowCopy,checksum256,publicMessage);
+    public static PackageResult Generate(Stream template,string output,string body,BodyKind kind,IReadOnlyList<string> paths,byte[] password,bool checksum,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null,bool allowCopy=true,bool checksum256=false,string? publicMessage=null)
     {
         string dest=Path.GetFullPath(output),sum=dest+".sha512",sum256=dest+".sha256",exeTemp=AtomicFile.Temporary(dest),sumTemp=AtomicFile.Temporary(dest),sum256Temp=AtomicFile.Temporary(dest);
         if(paths.Any(p=>string.Equals(Path.GetFullPath(p),dest,StringComparison.OrdinalIgnoreCase)||checksum&&string.Equals(Path.GetFullPath(p),sum,StringComparison.OrdinalIgnoreCase)||checksum256&&string.Equals(Path.GetFullPath(p),sum256,StringComparison.OrdinalIgnoreCase)))throw new IOException("出力先と添付元が同じです。");
@@ -16,7 +16,7 @@ public static class PackageWriter
         var committed=new List<(string Target,string Backup,bool Existed)>();
         try
         {
-            Container.Generate(template,exeTemp,body,kind,paths,password,false,ct,progress,allowCopy);
+            Container.Generate(template,exeTemp,body,kind,paths,password,false,ct,progress,allowCopy,publicMessage);
             ct.ThrowIfCancellationRequested();progress?.Report(new("完成ファイルのチェックサムを計算しています",0,1));
             string h256,h512;using(var f=File.OpenRead(exeTemp)){h256=Convert.ToHexString(SHA256.HashData(f));f.Position=0;h512=Convert.ToHexString(SHA512.HashData(f)).ToLowerInvariant();}
             if(checksum)File.WriteAllText(sumTemp,h512+"  "+Path.GetFileName(dest)+"\n",Limits.Utf8);

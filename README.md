@@ -107,9 +107,20 @@ Windowsの保護機能を無効化して使用することは推奨しません�
 
 ### パスワードで守る、自己復号型の暗号化メッセージ
 
-**CipherCapsule v1.1.10**
+**CipherCapsule v1.1.11**
 
-## v1.1.10の改良
+## v1.1.11の改良
+
+- メイン画面最上部で受信者向けの非暗号化TEXTメッセージを指定し、パスワード認証前に表示できます。最大UTF-8 4,096バイト、日本語・絵文字・改行・タブ対応。HTML・JavaScript・URLとして実行しません。
+- メッセージはパスワードなしで閲覧可能で、認証前は未認証です。送信者の真正性は保証されません。機密情報を入力しないでください。認証後は暗号化マニフェスト内のSHA-256と照合し、改ざん時は本文・添付を開きません。
+- メッセージありはCCAP v2、なしは従来v1です。**旧Windows v1.1.10／Android v1.0.5はv2非対応**です。メッセージなしのv1とASCII Armorの互換性を維持します。[バイナリ仕様](CONTAINER_V2.md)。
+- 自己展開アーカイブ、コピー許可、SHA-512、SHA-256の4チェックを成功時・通常終了時にINI保存し、再起動で復元します。初期値はON／ON／OFF／OFF。旧INIの正常値を維持し、不正な項目だけ既定値へ戻します。パスワード・鍵・通常本文・公開メッセージはINIへ保存しません。
+
+開発時自動検証98件成功／0件失敗、利用者のWindows実GUI手動確認は全項目合格。物理DPI切替は未検証です。今回の公開工程では再ビルド・再試験していません。
+
+正式EXE：`CipherCapsule_v1.1.11.exe`、174,417,847 bytes、SHA-256 `F93BCE10AACE841E83F02AC3F79560F62F71373CBC5491D3908E93DA6CA4A451`。[Release](https://github.com/SyuzouinYukyu/CipherCapsule/releases/tag/v1.1.11) · [対応ソース](https://github.com/SyuzouinYukyu/CipherCapsule/tree/v1.1.11)。Authenticode未署名のためSmartScreen等の警告が表示される場合があります。Windows 11 x64用、HTML機能にはWebView2 Runtimeが必要です。
+
+## v1.1.10の改良（過去版）
 
 - CCAPアイコンの自動登録を廃止し、過去の登録は管理記録と現在値を検証して安全な場合だけ元の値へ復元します。既知の登録用ICO・管理JSONも安全を確認して整理します。
 - HTMLエディターの診断JSON自動出力を廃止しました。
@@ -511,7 +522,7 @@ HTML編集・HTML表示にはMicrosoft Edge WebView2 Runtimeが必要です。
 
 ## ✉️ 暗号化メッセージを作成する
 
-1. `CipherCapsule_v1.1.10.exe`を起動します。
+1. `CipherCapsule_v1.1.11.exe`を起動します。
 2. メッセージ形式としてTEXTまたはHTMLを選択します。
 3. 本文を入力します。
 4. 必要に応じて添付ファイルを登録します。

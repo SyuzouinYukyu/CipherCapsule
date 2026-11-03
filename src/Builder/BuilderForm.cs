@@ -9,25 +9,26 @@ public sealed class BuilderForm : AppForm
     readonly Button openCcap,armorMessage;
     bool opening;readonly HashSet<Control> dropControls=[];
     readonly ComboBox mode=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=130,AccessibleName="本文形式"};
+    readonly TextBox publicMessage=new(){Multiline=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,AcceptsReturn=true,AcceptsTab=true,MaxLength=8192,AccessibleName="受信者向けメッセージ（非暗号化）"};
     readonly TextBox editor=new(){Multiline=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,AcceptsReturn=true,AcceptsTab=true,MaxLength=Limits.Body,AccessibleName="メッセージ本文",AllowDrop=true};
     readonly HtmlEditor htmlEditor=new(){Visible=false};readonly Panel bodyArea=new(){Dock=DockStyle.Fill};
     readonly ListView files=new(){Dock=DockStyle.Fill,View=View.Details,FullRowSelect=true,MultiSelect=true,HideSelection=false,AllowDrop=true,ShowItemToolTips=true,AccessibleName="添付ファイル"};
     readonly PasswordPanel password=new();
     readonly CheckBox allowCopy=new(){Text="テキストのコピーを許可する",Checked=true,AutoSize=true,Margin=new Padding(6)};
-    readonly CheckBox checksum=new(){Text="SHA-512チェックサムファイルを出力する",Checked=true,AutoSize=true,Margin=new Padding(6)};
+    readonly CheckBox checksum=new(){Text="SHA-512チェックサムファイルを出力する",Checked=false,AutoSize=true,Margin=new Padding(6)};
     readonly CheckBox checksum256=new(){Text="SHA-256チェックサムファイルを出力する",Checked=false,AutoSize=true,Margin=new Padding(6)};
     readonly TextBox result=new(){Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,AccessibleName="生成結果"};
     readonly ProgressBar bar=new(){Dock=DockStyle.Fill,Maximum=1000};
     readonly Label status=Label("本文とパスワードを入力し、「暗号化する」で保存先を確定してください。"),total=Label("添付 0件 / 0 B");
     readonly Button generate,cancel;readonly Panel editArea=new(){Dock=DockStyle.Fill};readonly List<string> paths=[];readonly ToolTip tips=new();
-    readonly TableLayoutPanel root=new(){Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(12)};
+    readonly TableLayoutPanel root=new(){Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(12)};
     readonly TableLayoutPanel config=new(){Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1};CancellationTokenSource? cts;bool busy,closing,closePending;
     string lastOutputDirectory=Settings.Documents;
     public BuilderForm()
     {
-        Text="CipherCapsule v1.1.10";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
+        Text="CipherCapsule v1.1.11";MinimumSize=new Size(900,920);ClientSize=new Size(1240,980);
         var settings=Settings.Load();SetSize(settings.Font);Size=new Size(Math.Max(900,settings.Width),Math.Max(960,settings.Height));
-        lastOutputDirectory=settings.LastOutputDirectory;
+        lastOutputDirectory=settings.LastOutputDirectory;allowCopy.Checked=settings.AllowCopy;checksum.Checked=settings.ChecksumSHA512;checksum256.Checked=settings.ChecksumSHA256;
         password.SetRevealed(settings.PasswordRevealed);
         var rect=new Rectangle(settings.X,settings.Y,Width,Height);if(Screen.AllScreens.Any(s=>Rectangle.Intersect(s.WorkingArea,rect).Width>=200&&Rectangle.Intersect(s.WorkingArea,rect).Height>=100)){StartPosition=FormStartPosition.Manual;Location=rect.Location;}
         mode.Items.AddRange(["TEXT","HTML"]);mode.SelectedIndex=settings.Kind;selfExtracting.Checked=ArchiveOutputSelection.IsSelfExtracting(settings.OutputFormat);
@@ -45,20 +46,21 @@ public sealed class BuilderForm : AppForm
         armorMessage=Button("暗号メッセージ",(_,_)=>{if(busy||opening)return;using var dialog=new ArmorMessageForm(UiSize);dialog.ShowDialog(this);});
         config.Controls.Add(Flow(selfExtracting));config.Controls.Add(Flow(openCcap,armorMessage));
         config.Controls.Add(password);config.Controls.Add(Label("空欄不可・最大256文字。空白も保持します。安全のため長いパスフレーズを推奨します。"));var sums=new FlowLayoutPanel{AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=false,Margin=new Padding(0)};sums.Controls.AddRange([checksum,checksum256]);config.Controls.Add(Flow(allowCopy,sums));config.Controls.Add(actions);
-        root.RowStyles.Add(new(SizeType.Percent,100));root.RowStyles.Add(new(SizeType.AutoSize));root.RowStyles.Add(new(SizeType.Absolute,94));root.RowStyles.Add(new(SizeType.AutoSize));root.Controls.Add(editArea,0,0);root.Controls.Add(config,0,1);root.Controls.Add(result,0,2);
-        var progress=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=1};progress.Controls.Add(status);progress.Controls.Add(bar);root.Controls.Add(progress,0,3);Controls.Add(root);
+        var publicArea=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=1,RowCount=3};publicArea.Controls.Add(Label("受信者向けメッセージ（非暗号化）"));publicArea.Controls.Add(publicMessage);publicArea.Controls.Add(new Label{AutoSize=true,Dock=DockStyle.Fill,MaximumSize=new Size(1100,0),Text="このメッセージは暗号化されません。パスワードを知らない第三者にも閲覧される可能性があります。機密情報を入力しないでください。"});publicMessage.Height=80;root.RowStyles.Add(new(SizeType.AutoSize));root.Controls.Add(publicArea,0,0);
+        root.RowStyles.Add(new(SizeType.Percent,100));root.RowStyles.Add(new(SizeType.AutoSize));root.RowStyles.Add(new(SizeType.Absolute,94));root.RowStyles.Add(new(SizeType.AutoSize));root.Controls.Add(editArea,0,1);root.Controls.Add(config,0,2);root.Controls.Add(result,0,3);
+        var progress=new TableLayoutPanel{AutoSize=true,Dock=DockStyle.Fill,ColumnCount=1};progress.Controls.Add(status);progress.Controls.Add(bar);root.Controls.Add(progress,0,4);Controls.Add(root);
         tips.SetToolTip(allowCopy,"コピー禁止は通常のUI操作の制限です。スクリーンショットやOCR、メモリ解析を防ぐDRMではありません。");tips.SetToolTip(checksum,"SHA-512は完成ファイル全体の整合性確認用です。送信者本人の証明にはなりません。");tips.SetToolTip(checksum256,"SHA-256は完成ファイル全体のチェックサムを.sha256へ出力します。送信者本人の証明にはなりません。");tips.SetToolTip(selfExtracting,"ON：自己復号EXE（.exe）を作成します。OFF：CCAP（.ccap）を作成します。");
         password.ValidityChanged+=(_,_)=>UpdateRun();mode.SelectedIndexChanged+=(_,_)=>SwitchMode();
         AttachFileDrops(this);
         htmlEditor.FileDropRequested=values=>HandleFileDrop(values,FileDropArea.Other);
         FormClosing+=async(_,e)=>{if(closing)return;e.Cancel=true;if(busy){cts?.Cancel();return;}if(closePending)return;closePending=true;bool cleaned=await htmlEditor.CloseAsync();if(!cleaned)MessageBox.Show(this,"WebView2の一時領域を削除できませんでした。完全消去は保証できません。\n"+htmlEditor.CleanupFailure,"一時領域",MessageBoxButtons.OK,MessageBoxIcon.Warning);
             SaveSettings();
-            password.ClearSecrets();editor.Clear();result.Clear();closing=true;Close();};
+            password.ClearSecrets();publicMessage.Clear();editor.Clear();result.Clear();closing=true;Close();};
         SwitchMode();UpdateRun();SizeChecksumRow();
     }
     void SwitchMode(){bool html=mode.SelectedIndex==1;editor.Visible=!html;htmlEditor.Visible=html;if(html)htmlEditor.BringToFront();else editor.BringToFront();}
     void UpdateRun()=>generate.Enabled=!busy&&!opening&&password.CanRun;
-    void SetBusy(bool value){busy=value;selfExtracting.Enabled=!value;openCcap.Enabled=!value;armorMessage.Enabled=!value;editArea.Enabled=!value;password.Enabled=!value;allowCopy.Enabled=!value;checksum.Enabled=!value;checksum256.Enabled=!value;generate.Enabled=!value&&password.CanRun;cancel.Enabled=value;}
+    void SetBusy(bool value){busy=value;publicMessage.Enabled=!value;selfExtracting.Enabled=!value;openCcap.Enabled=!value;armorMessage.Enabled=!value;editArea.Enabled=!value;password.Enabled=!value;allowCopy.Enabled=!value;checksum.Enabled=!value;checksum256.Enabled=!value;generate.Enabled=!value&&password.CanRun;cancel.Enabled=value;}
     bool DropBlocked=>busy||opening||closing||closePending||IsDisposed||Disposing||!Enabled;
     FileDropArea DropArea(Control control)=>ReferenceEquals(control,editor)?FileDropArea.TextBody:ReferenceEquals(control,files)?FileDropArea.Attachments:FileDropArea.Other;
     static string[] DroppedFiles(IDataObject? data){try{return data?.GetData(DataFormats.FileDrop,false) as string[]??[];}catch{return [];}}
@@ -99,7 +101,7 @@ public sealed class BuilderForm : AppForm
     {
         if(busy||opening)return;byte[]? p=null;var watch=Stopwatch.StartNew();string stage="入力の検証";string? workFolder=null;HashSet<string> previousTemporary=[];
         try{
-            SetBusy(true);p=password.Take(true);BodyKind kind=(BodyKind)mode.SelectedIndex;string body=kind==BodyKind.HTML?await htmlEditor.GetContent():editor.Text;Limits.BodyText(body);Limits.Inputs(paths);
+            SetBusy(true);string publicText=PublicMessage.Normalize(publicMessage.Text);p=password.Take(true);BodyKind kind=(BodyKind)mode.SelectedIndex;string body=kind==BodyKind.HTML?await htmlEditor.GetContent():editor.Text;Limits.BodyText(body);Limits.Inputs(paths);
             if(kind==BodyKind.HTML){body=SafeHtml.ValidateEditor(body,out bool warning);if(warning&&MessageBox.Show(this,"HTMLに不正な構造または危険な要素があります。安全に正規化した本文で暗号化しますか？","HTML安全性",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes){status.Text="暗号化をキャンセルしました。入力内容は保持しています。";return;}}
             using var d=CreateSaveDialog();
             if(d.ShowDialog(this)!=DialogResult.OK){status.Text="保存先の選択をキャンセルしました。入力内容は保持しています。";return;}
@@ -109,7 +111,7 @@ public sealed class BuilderForm : AppForm
             foreach(string suffix in new[]{checksum.Checked?".sha512":null,checksum256.Checked?".sha256":null}.OfType<string>())if(File.Exists(dest+suffix)&&MessageBox.Show(this,"既存のチェックサムファイルを置き換えますか？\n"+dest+suffix,"上書き確認",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes){status.Text="暗号化をキャンセルしました。";return;}
             workFolder=Path.GetDirectoryName(dest)!;previousTemporary=Directory.EnumerateFiles(workFolder,".cc-*.tmp").ToHashSet(StringComparer.OrdinalIgnoreCase);cts=new();result.Clear();var progress=new Progress<CapsuleProgress>(x=>{stage=x.Stage;status.Text=x.Stage+(x.Total>1?$" {Display.Size(x.Done)} / {Display.Size(x.Total)}":"");bar.Value=(int)Math.Clamp(x.Done*1000/Math.Max(1,x.Total),0,1000);});
             string[] inputs=paths.ToArray();byte[] pw=p;bool sum=checksum.Checked,sum256=checksum256.Checked,copy=allowCopy.Checked;stage="暗号化";
-            var package=await Task.Run(()=>{using var template=format==OutputFormat.CCAP?Stream.Null:Assembly.GetExecutingAssembly().GetManifestResourceStream("ViewerTemplate")??throw new IOException();return PackageWriter.Generate(template,dest,body,kind,inputs,pw,sum,true,cts.Token,progress,copy,sum256);});
+            var package=await Task.Run(()=>{using var template=format==OutputFormat.CCAP?Stream.Null:Assembly.GetExecutingAssembly().GetManifestResourceStream("ViewerTemplate")??throw new IOException();return PackageWriter.Generate(template,dest,body,kind,inputs,pw,sum,true,cts.Token,progress,copy,sum256,publicText);});
             lastOutputDirectory=Path.GetDirectoryName(package.Path)!;SaveSettings();
             watch.Stop();string message=$"暗号化が完了しました。\r\n出力形式：{(format==OutputFormat.CCAP?"CipherCapsule形式 (.ccap)":"自己復号EXE (.exe)")}\r\n\r\nファイル名：{Path.GetFileName(package.Path)}\r\n保存先：{Path.GetDirectoryName(package.Path)}\r\nフルパス：{package.Path}\r\nファイルサイズ：{Display.Size(package.Size)} ({package.Size:N0} B)\r\n処理時間：{Display.Time(watch.Elapsed)}\r\nSHA-512：{(package.Sha512!=null?"正常に生成しました。":"出力しない設定です。")}\r\nSHA-256チェックサムファイル：{(package.Sha256FileWritten?"正常に生成しました。":"出力しない設定です。")}\r\nSHA-256：{package.Sha256}";
             result.Text=message;status.Text="暗号化完了。パスワードと編集内容はこのセッション内で保持しています。";ResultDialog(message,"暗号化成功",package.Path);
@@ -143,7 +145,7 @@ public sealed class BuilderForm : AppForm
 
     bool SaveSettings()
     {
-        try{var b=WindowState==FormWindowState.Normal?Bounds:RestoreBounds;new Settings{X=b.X,Y=b.Y,Width=b.Width,Height=b.Height,Font=UiSize,Kind=mode.SelectedIndex,OutputFormat=ArchiveOutputSelection.FromSelfExtracting(selfExtracting.Checked),PasswordRevealed=password.Revealed,LastOutputDirectory=lastOutputDirectory}.Save();return true;}
+        try{var b=WindowState==FormWindowState.Normal?Bounds:RestoreBounds;new Settings{X=b.X,Y=b.Y,Width=b.Width,Height=b.Height,Font=UiSize,Kind=mode.SelectedIndex,OutputFormat=ArchiveOutputSelection.FromSelfExtracting(selfExtracting.Checked),AllowCopy=allowCopy.Checked,ChecksumSHA512=checksum.Checked,ChecksumSHA256=checksum256.Checked,PasswordRevealed=password.Revealed,LastOutputDirectory=lastOutputDirectory}.Save();return true;}
         catch{MessageBox.Show(this,"設定を保存できません。EXE配置先の書込み権限を確認してください。完成した暗号化EXEと現在の入力内容は保持しています。","設定保存",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}
     }
     static ReadOnlyDialog CreateResultDialog(string message,string title,string? completedOutputPath=null)
