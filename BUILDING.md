@@ -1,14 +1,15 @@
-# Windows v1.1.11 ビルド
+# Windows v1.1.12 ビルド
 
-公開リポジトリ直下で `python scripts/build_repository.py --stage` を実行します。`--check-inputs` は固定依存資産の入力検証だけを行います。.NET SDK 10.0.403、Windows 11 x64、固定NuGet版とロックファイルを使います。既存のvendor/libsodium.dllを再利用し、libsodium・Androidアプリは再ビルドしません。
+Windows 11 x64、Python、Node.js、.NET SDK 10.0.404を使用します。Runtime/ILLink 10.0.13、NuGet依存関係はプロジェクトとロックファイルに固定しています。
 
-ViewerをRelease/win-x64/SelfContained/PublishSingleFile/PublishTrimmed=falseで圧縮Publishし、templates/CipherCapsule_Viewer.exeを更新してからBuilderをPublishします。Builderの出力はWork/stage1111/Builder/CipherCapsule_v1.1.11.exeです。既存ステージの上書きは拒否します。
+公開リポジトリ直下で `python scripts/build_repository.py --check-inputs` により固定依存入力とlibsodium公式署名を検証できます。ビルドは `python scripts/build_repository.py --stage` です。
 
-過去v1.1.10の参考試験：`python scripts/test1110.py`。GUIや実ユーザーのレジストリを操作しない隔離ストア、メモリ内Armor、通常ファイル経路、旧版・Android互換Coreを検証します。テスト用のジャンクション作成には実行環境の許可が必要です。既存の全件GUI試験は呼び出しません。
+補助スクリプトは未使用の `Work/rebuild/<時刻>/Source` に公開入力を複製し、`scripts/build.py` → `scripts/build1112.py` を実行します。Viewer → テンプレート → Builderの順で、Release / win-x64 / SelfContained / PublishSingleFile / PublishTrimmed=false、SingleFile圧縮有効で発行します。出力は表示される `Work/stage1112/Builder/CipherCapsule_v1.1.12.exe` です。既存ステージ・ログを上書きせず、配布済みEXEは置き換えません。
 
-tests/Privacy1110/Legacy119は参照用v1.1.9 Coreのコピー、Android104は公開コミットを固定した未改変のAndroid Coreです。android-source-origin.jsonにGit blobを記録しています。これらはWindowsホストで互換性を調べる試験入力で、正式アプリには含みません。旧版開発ディレクトリへの出力は行いません。
+libsodium DLLおよびTinyMCE資産は固定版を再利用します。SDKの自動更新やAndroidビルドは行いません。依存・ライセンス資料は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) と [過去の詳細資料](BUILDING_PREVIOUS_REFERENCE.md) を参照してください。
 
-従来の依存関係・第三者ライセンスはBUILDING_PREVIOUS_REFERENCE.mdを参照してください。実デスクトップへ入力・フォーカスを送る検証は行いません。開発時の実機GUI結果は上記の記録に含まれます。
+関連ロジック試験の再現: 分離された新しいコピーのSourceで `dotnet run --project tests/Secure1112/Secure1112.csproj -c Release -p:NuGetAudit=false -- <未使用の絶対パス>`。この試験は指定ダミー領域にACL・ジャンクションを作成し、専用子プロセスの異常終了を検証します。実データを指定しないでください。リンク作成が制限される環境では該当試験が失敗する場合があります。
 
-SDK 10.0.403を使用し、Runtime/ILLinkは10.0.13へ固定します。build.pyはbuild1111.pyを呼び、Viewer→テンプレート→Builderの順でPublishします。公開工程では再ビルド・再署名を行っていません。新試験はtests/Public1111、非表示構成検査はtests/Public1111Layoutです。物理DPI切替は未検証です。
-`dotnet run --project tests/Public1111/Public1111.Tests.csproj -c Release -- <未使用の結果先> <Viewerテンプレート>` がv1.1.11の限定試験です。公開工程では実行していません。
+開発時の34件成功／失敗0件と利用者GUI5件合格は既存の検証実績です。今回の公開工程では再ビルド・再試験していません。物理DPI切替、ACL非対応実媒体、実ディスク容量枯渇は未検証です。
+
+tests/Privacy1110/Legacy119とAndroid104は過去の互換性試験入力で、正式アプリへ含めません。旧版やAndroidの開発領域を変更しません。

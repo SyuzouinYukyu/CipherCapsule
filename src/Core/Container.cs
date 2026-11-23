@@ -222,17 +222,17 @@ public static class Container
         internal UnlockedCapsule(Stream source,long start,Manifest m,byte[] dek,bool ownsSource,string publicText) { PublicMessageText=publicText; this.source=source; this.ownsSource=ownsSource; this.start=start; Manifest=m; this.dek=dek; }
         public void Save(int index,string output,bool overwrite,CancellationToken ct,IProgress<CapsuleProgress>? progress=null)
         {
-            gate.Wait(ct); string? temp=null; byte[]? key=null,state=null,plain=null,enc=null;
+            gate.Wait(ct); SecureAttachment? secure=null; Exception? failure=null; string? temp=null; byte[]? key=null,state=null,plain=null,enc=null;
             try
             {
                 ObjectDisposedException.ThrowIf(disposed,this);
                 if(index<0 || index>=Manifest.Attachments.Count) throw new ArgumentOutOfRangeException(nameof(index));
                 string dest=Path.GetFullPath(output); Limits.FileName(Path.GetFileName(dest));
                 if(source is FileStream file&&string.Equals(dest,file.Name,StringComparison.OrdinalIgnoreCase)) throw new IOException("実行中の暗号化EXEには保存できません。");
-                temp=AtomicFile.Temporary(dest); var a=Manifest.Attachments[index];
+                secure=SecureAttachment.Create(dest); temp=secure.PathName; var a=Manifest.Attachments[index];
                 key=Sodium.Derive(dek,(ulong)index+1,"CCATTCH1"); state=Sodium.NewState(); plain=new byte[Limits.Chunk]; enc=new byte[Limits.Chunk+17];
                 source.Position=start+a.Offset; Sodium.InitPull(state,Read(source,24),key); long left=a.Size;
-                using(var target=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None,Limits.Chunk,FileOptions.SequentialScan))
+                using(var target=new FileStream(temp,FileMode.Open,FileAccess.Write,FileShare.None,Limits.Chunk,FileOptions.SequentialScan))
                 {
                     do {
                         ct.ThrowIfCancellationRequested(); int n=(int)Math.Min(left,Limits.Chunk),cl=checked((int)U32(Read(source,4),0));
@@ -246,7 +246,8 @@ public static class Container
                 }
                 ct.ThrowIfCancellationRequested(); AtomicFile.Commit(temp,dest,overwrite);
             }
-            finally { AtomicFile.Delete(temp); Sodium.Wipe(key); Sodium.Wipe(state); Sodium.Wipe(plain); Sodium.Wipe(enc); gate.Release(); }
+            catch(Exception ex){failure=ex;throw;}
+            finally { try { secure?.Finish(failure); } finally { secure?.Dispose(); Sodium.Wipe(key); Sodium.Wipe(state); Sodium.Wipe(plain); Sodium.Wipe(enc); gate.Release(); } }
         }
         public void Dispose() { gate.Wait(); try { if(disposed)return; disposed=true; Sodium.Wipe(dek); Manifest.Body=""; if(ownsSource)source.Dispose(); } finally { gate.Release(); } }
     }

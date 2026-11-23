@@ -40,6 +40,7 @@ public static class AttachmentResults
     public static ReadOnlyDialog Batch(BatchSaveResult result,Action<ProcessStartInfo>? launch=null,Action<string>? warn=null)
     {
         string message=$"保存成功：{result.Succeeded}件\r\n保存失敗：{result.Failed}件\r\n未処理：{result.Unprocessed}件\r\n保存先：{result.Folder}\r\n結果：{result.Reason}\r\n処理時間：{Display.Time(result.Elapsed)}";
+        if(result.ResidueWarning!=null)message=result.ResidueWarning+"\r\n\r\n"+message;
         return Create(result.Failed==0&&!result.Canceled?"一括保存完了":"一括保存結果",message,result.Succeeded>0?result.Folder:null,launch,warn);
     }
     static ReadOnlyDialog Create(string title,string message,string? folder,Action<ProcessStartInfo>? launch,Action<string>? warn)

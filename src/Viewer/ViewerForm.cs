@@ -44,6 +44,7 @@ public sealed class ViewerForm : AppForm
         try{string dest=AttachmentNames.SinglePath(d.FileName,a.Name);bool overwrite=File.Exists(dest);
             if(overwrite&&MessageBox.Show(this,"既存のファイルを上書きしますか？\n"+dest,"上書き確認",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             AttachmentNames.ValidateTarget(dest);SetSaving(true);var p=new Progress<CapsuleProgress>(x=>{status.Text=x.Stage+$" {Display.Size(x.Done)} / {Display.Size(x.Total)}";bar.Value=(int)Math.Clamp(x.Done*1000/Math.Max(1,x.Total),0,1000);});await Task.Run(()=>capsule.Save(i,dest,overwrite,cts!.Token,p));watch.Stop();status.Text="添付を保存しました。";using var summary=AttachmentResults.Single($"添付を保存しました。\n\nファイル名：{Path.GetFileName(dest)}\n保存先：{dest}\nサイズ：{Display.Size(a.Size)} ({a.Size:N0} B)\n処理時間：{Display.Time(watch.Elapsed)}",dest);summary.ShowDialog(this);}
+        catch(PlaintextResidueException ex){status.Text="警告：平文一時ファイルが残っています。";using var warning=new ReadOnlyDialog("平文一時ファイルの警告",ex.Message,new Size(900,600),true);warning.ShowDialog(this);}
         catch(Exception ex){status.Text=ex is OperationCanceledException?"保存をキャンセルしました。":"添付を保存できませんでした。";Error(this,ex);}
         finally{SetSaving(false);}
     }

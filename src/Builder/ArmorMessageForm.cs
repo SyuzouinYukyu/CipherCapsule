@@ -17,7 +17,7 @@ public sealed class ArmorMessageForm:AppForm
 
     public ArmorMessageForm(float size)
     {
-        Text="CipherCapsule v1.1.10 — 暗号メッセージ";ClientSize=new Size(1080,880);MinimumSize=new Size(800,760);
+        Text="CipherCapsule v1.1.12 — 暗号メッセージ";ClientSize=new Size(1080,880);MinimumSize=new Size(800,760);
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=12,Padding=new Padding(12)};
         layout.ColumnStyles.Add(new(SizeType.Percent,100));
         for(int i=0;i<12;i++)layout.RowStyles.Add(new(i==3?SizeType.Percent:i==5?SizeType.Percent:i==7?SizeType.Percent:SizeType.AutoSize,i==3?25:i==5?45:i==7?30:0));

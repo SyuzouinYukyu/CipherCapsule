@@ -51,7 +51,7 @@ public static class AttachmentNames
 }
 public sealed record BatchProgress(int Total,int Completed,string Current,double Fraction,long BytesDone,long BytesTotal);
 public sealed record SavedAttachment(int Index,string Path);
-public sealed record BatchSaveResult(int Succeeded,int Failed,int Unprocessed,string Folder,string Reason,bool Canceled,TimeSpan Elapsed,IReadOnlyList<SavedAttachment> Saved);
+public sealed record BatchSaveResult(int Succeeded,int Failed,int Unprocessed,string Folder,string Reason,bool Canceled,TimeSpan Elapsed,IReadOnlyList<SavedAttachment> Saved) { public string? ResidueWarning {get;init;} }
 public static class AttachmentBatch
 {
     sealed class Forward(Action<CapsuleProgress> report):IProgress<CapsuleProgress>{public void Report(CapsuleProgress p)=>report(p);}
@@ -72,6 +72,7 @@ public static class AttachmentBatch
                 progress?.Report(new(count,saved.Count,a.Name,(double)saved.Count/Math.Max(1,count),done,total));
             }
         }
+        catch(PlaintextResidueException e){return new(saved.Count,1,count-saved.Count-1,folder,"保存処理と一時領域の整理を中断しました。",e.InnerException is OperationCanceledException,watch.Elapsed,saved){ResidueWarning=e.Message};}
         catch(OperationCanceledException){canceled=true;reason="保存をキャンセルしました。正常保存済みのファイルは保持しています。";}
         catch(Exception e){failed=count>saved.Count?1:0;reason=e is System.Security.Cryptography.CryptographicException?Container.AuthFailure:e is ArgumentException or InvalidDataException?e.Message:e is UnauthorizedAccessException?"保存先へのアクセスが拒否されました。":"保存を中断しました。保存先の使用状況・空き容量・名前の衝突を確認してください。";}
         return new(saved.Count,failed,count-saved.Count-failed,folder,reason,canceled,watch.Elapsed,saved);
